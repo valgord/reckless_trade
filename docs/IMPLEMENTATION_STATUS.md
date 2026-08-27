@@ -10,9 +10,27 @@
 - Execution intent planning.
 - Lightweight research backtester with fee/spread/slippage costs for fast hypothesis rejection.
 - Research metrics, expanding walk-forward folds and bootstrap robustness analysis.
-- Official NautilusTrader Bybit TradingNode factory for Demo/Mainnet Spot.
+- Typed NautilusTrader Bybit TradingNode configuration for Demo/Mainnet Spot with startup reconciliation.
+- Demo instrument/ticker discovery, authenticated account/balance presence and open-order reconciliation smoke checks.
+- Separately gated, notional-capped Demo submit/cancel smoke with cancellation on unknown submit outcome.
+- Orderless continuous Demo observer connecting live/historical bars to the domain strategy pipeline, with runtime status.
+- Bybit Demo authenticated access, submit/cancel lifecycle, restart reconciliation and continuous observer verified end to end.
+- Incremental Bybit bar ingestion, continuity validation, Nautilus Parquet catalog and BacktestNode strategy execution.
+- USDT and BTC-relative benchmark report with configured all-in fill costs and an API status endpoint.
+- Append-only experiment registry, alpha ablations, minimum-hold sweep, expanding walk-forward/OOS selection,
+  regime attribution, cost stress, bootstrap, DSR/PBO and automatic promotion gate.
+- Fast-research winners are re-run through Nautilus BacktestNode before they can satisfy the research gate.
+- Volatility-expansion alpha, hard regime gating, configurable regime-entry confirmation and minimum-activity
+  eligibility which prevents inactive cash strategies from winning selection.
+- Aligned BTC/ETH/SOL portfolio research with inverse-volatility sizing, single/total/venue exposure limits,
+  correlated-pair budgets, turnover costs, risk-matched benchmarks and a drawdown kill switch.
+- Independent RSS ingestion with HTTP timeouts, atomic raw archive, durable fingerprints, PostgreSQL deduplication,
+  provenance, publication/first-seen timestamps, per-source rate limits and health reporting.
 - RSS ingestion worker with deduplication and LLM analysis HTTP handoff.
-- Ollama JSON news classifier with deterministic temperature and timing audit fields.
+- Strict Ollama structured-event contract with deterministic temperature, prompt/model/hash audit, stable replay IDs
+  and preserved publication, first-seen, analysis-start, completion and strategy-availability timestamps.
+- PostgreSQL-hydrated Qdrant similarity candidates and a costed M7 A/B replay with an explicit LLM-disabled arm,
+  minimum coverage gates and future-information blocking.
 - PostgreSQL audit models, Docker Compose, optional Qdrant, Prometheus/Grafana, backup/restore and CI.
 - Live trading lock and physically separate demo/live credential names.
 
@@ -20,6 +38,7 @@
 
 - No strategy is claimed profitable before historical and forward validation.
 - No hard-coded live order sizing exists before instrument/account metadata is reconciled from Bybit.
-- Qdrant similarity results are not promoted into domain events until relational timing/audit hydration is implemented.
+- The M7 machinery is validated, but the current report contains zero model analyses. No model quality or news alpha
+  benefit is claimed until a sufficiently large replay-aligned event set exists.
 - Market making, statistical arbitrage and funding/basis strategies need L2/funding datasets and have contracts but are not represented by toy implementations.
 - Production backtests use Nautilus BacktestNode; the local simple engine exists only for fast mathematical sanity checks.

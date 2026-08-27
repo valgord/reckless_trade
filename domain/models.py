@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Mapping
 
 
 class Side(StrEnum):
@@ -57,7 +57,7 @@ class Signal:
     strength: float
     confidence: float
     horizon_seconds: int
-    ts_event: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    ts_event: datetime = field(default_factory=lambda: datetime.now(UTC))
     metadata: Mapping[str, str | float | int | bool] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -81,7 +81,7 @@ class TargetAllocation:
 class PortfolioTarget:
     allocations: tuple[TargetAllocation, ...]
     numeraire: str
-    ts_event: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    ts_event: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     @property
     def weights(self) -> dict[str, float]:
@@ -112,6 +112,7 @@ class IntelligenceEvent:
     first_seen_at: datetime
     analysis_completed_at: datetime
     available_to_strategy_at: datetime
+    analysis_started_at: datetime | None = None
 
     def __post_init__(self) -> None:
         if not -1 <= self.direction <= 1:
@@ -121,3 +122,7 @@ class IntelligenceEvent:
                 raise ValueError(f"{name} must be in [0, 1]")
         if self.available_to_strategy_at < self.analysis_completed_at:
             raise ValueError("event cannot be available before analysis completes")
+        if self.analysis_started_at and self.analysis_completed_at < self.analysis_started_at:
+            raise ValueError("analysis cannot complete before it starts")
+        if self.analysis_completed_at < self.first_seen_at:
+            raise ValueError("analysis cannot complete before the article is first seen")

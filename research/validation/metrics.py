@@ -56,5 +56,7 @@ def profit_factor(returns: list[float] | tuple[float, ...]) -> float:
 def turnover(weights: list[dict[str, float]]) -> float:
     if len(weights) < 2:
         return 0.0
-    return sum(sum(abs(curr.get(k, 0.0) - prev.get(k, 0.0)) for k in set(prev) | set(curr))
-               for prev, curr in zip(weights, weights[1:], strict=False))
+    return sum(
+        sum(abs(curr.get(k, 0.0) - prev.get(k, 0.0)) for k in set(prev) | set(curr))
+        for prev, curr in zip(weights, weights[1:], strict=False)
+    )

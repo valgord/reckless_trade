@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import math
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from research.backtests.simple_engine import BacktestPoint, CostModel, LongOnlyBarBacktester
 from research.validation.metrics import calmar, max_drawdown, sharpe, sortino
@@ -11,7 +11,7 @@ from research.validation.robustness import bootstrap_terminal_equity
 
 def main() -> None:
     # Deterministic synthetic series validates the research plumbing; it is not evidence of profitability.
-    start = datetime(2025, 1, 1, tzinfo=timezone.utc)
+    start = datetime(2025, 1, 1, tzinfo=UTC)
     prices = [100 * math.exp(0.0003 * i + 0.02 * math.sin(i / 12)) for i in range(400)]
     points = [BacktestPoint(start + timedelta(hours=i), price) for i, price in enumerate(prices)]
 

@@ -27,3 +27,11 @@ regime:
 intelligence:
   enabled: false
   weight: 0.25
+demo_runtime:
+  historical_days: 2
+  max_bars: 500
+  status_path: data/runtime/demo-strategy.json
+  risk:
+    max_order_notional_usdt: 10
+    max_order_submit_rate: 1/00:01:00
+    max_order_modify_rate: 2/00:01:00

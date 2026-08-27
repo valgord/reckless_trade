@@ -1,0 +1,31 @@
+services:
+  intelligence:
+    environment:
+      INTELLIGENCE_ENABLED: "true"
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:14b}
+
+  ollama:
+    image: ${OLLAMA_IMAGE:-ollama/ollama:rocm}
+    devices:
+      - /dev/kfd:/dev/kfd
+      - /dev/dri:/dev/dri
+    group_add:
+      - video
+
+  trader:
+    environment:
+      TRADING_MODE: demo
+      RUN_NAUTILUS_NODE: "false"
+      ENABLE_DEMO_STRATEGY: "false"
+
+  control-api:
+    environment:
+      TRADING_MODE: demo
+      RUN_NAUTILUS_NODE: "false"
+      ENABLE_DEMO_STRATEGY: "false"
+      NEWS_FORWARD_TO_INTELLIGENCE: "false"
+
+  news-worker:
+    environment:
+      NEWS_FORWARD_TO_INTELLIGENCE: "false"

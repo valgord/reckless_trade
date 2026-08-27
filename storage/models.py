@@ -40,6 +40,7 @@ class NewsArticle(Base):
 
 class LlmAnalysis(Base):
     __tablename__ = "llm_analyses"
+    __table_args__ = (UniqueConstraint("article_id", "model", "prompt_hash", name="uq_llm_analysis_replay"),)
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     article_id: Mapped[str] = mapped_column(String(36), index=True)
     model: Mapped[str] = mapped_column(String(128))

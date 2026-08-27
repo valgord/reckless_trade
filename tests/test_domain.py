@@ -7,7 +7,9 @@ from trading.risk.policy import PortfolioRiskPolicy
 
 def test_mean_reversion_emits_countertrend_signal():
     closes = [100.0] * 49 + [120.0]
-    signal = MeanReversionAlpha(window=50, entry_z=2.0).generate(PriceSeriesContext(InstrumentKey("BYBIT", "BTCUSDT"), closes))[0]
+    signal = MeanReversionAlpha(window=50, entry_z=2.0).generate(
+        PriceSeriesContext(InstrumentKey("BYBIT", "BTCUSDT"), closes)
+    )[0]
     assert signal.direction == -1.0
 
 

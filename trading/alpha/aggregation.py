@@ -20,8 +20,20 @@ class WeightedSignalAggregator:
             denominator = sum(self.weights.get(s.source, 1.0) * s.confidence for s in items)
             if denominator == 0:
                 continue
-            score = sum(self.weights.get(s.source, 1.0) * s.confidence * s.direction * s.strength for s in items) / denominator
+            score = (
+                sum(self.weights.get(s.source, 1.0) * s.confidence * s.direction * s.strength for s in items)
+                / denominator
+            )
             confidence = min(sum(s.confidence for s in items) / len(items), 1.0)
-            result.append(Signal("aggregate", items[0].instrument, max(-1.0, min(1.0, score)), abs(score), confidence,
-                                 max(s.horizon_seconds for s in items), metadata={"contributors": len(items)}))
+            result.append(
+                Signal(
+                    "aggregate",
+                    items[0].instrument,
+                    max(-1.0, min(1.0, score)),
+                    abs(score),
+                    confidence,
+                    max(s.horizon_seconds for s in items),
+                    metadata={"contributors": len(items)},
+                )
+            )
         return result

@@ -20,5 +20,9 @@ def bootstrap_terminal_equity(returns: list[float], paths: int = 2000, seed: int
     arr = np.asarray(returns, dtype=float)
     samples = rng.choice(arr, size=(paths, len(arr)), replace=True)
     terminals = np.prod(1.0 + samples, axis=1)
-    return BootstrapSummary(float(np.median(terminals)), float(np.quantile(terminals, 0.05)),
-                            float(np.quantile(terminals, 0.95)), float(np.mean(terminals < 1.0)))
+    return BootstrapSummary(
+        float(np.median(terminals)),
+        float(np.quantile(terminals, 0.05)),
+        float(np.quantile(terminals, 0.95)),
+        float(np.mean(terminals < 1.0)),
+    )

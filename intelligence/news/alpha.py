@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from domain.models import InstrumentKey, IntelligenceEvent, Signal
 
@@ -11,8 +11,10 @@ class NewsAlpha:
         self.min_importance = min_importance
         self.min_confidence = min_confidence
 
-    def generate(self, event: IntelligenceEvent, symbol_map: dict[str, str], now: datetime | None = None) -> list[Signal]:
-        now = now or datetime.now(timezone.utc)
+    def generate(
+        self, event: IntelligenceEvent, symbol_map: dict[str, str], now: datetime | None = None
+    ) -> list[Signal]:
+        now = now or datetime.now(UTC)
         if now < event.available_to_strategy_at:
             return []
         if event.importance < self.min_importance or event.confidence < self.min_confidence:
@@ -22,7 +24,16 @@ class NewsAlpha:
         for asset in event.assets:
             symbol = symbol_map.get(asset)
             if symbol:
-                signals.append(Signal("news_llm", InstrumentKey(self.venue, symbol), event.direction, strength,
-                                      event.confidence, event.horizon_seconds, ts_event=event.available_to_strategy_at,
-                                      metadata={"event_id": event.event_id, "event_type": event.event_type}))
+                signals.append(
+                    Signal(
+                        "news_llm",
+                        InstrumentKey(self.venue, symbol),
+                        event.direction,
+                        strength,
+                        event.confidence,
+                        event.horizon_seconds,
+                        ts_event=event.available_to_strategy_at,
+                        metadata={"event_id": event.event_id, "event_type": event.event_type},
+                    )
+                )
         return signals

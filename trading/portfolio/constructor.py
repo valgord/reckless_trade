@@ -14,7 +14,9 @@ class LongOnlySignalPortfolioConstructor:
         self.min_signal = min_signal
 
     def construct(self, signals: Iterable[Signal], numeraire: str) -> PortfolioTarget:
-        candidates = [s for s in signals if s.direction > 0 and s.direction * s.strength * s.confidence >= self.min_signal]
+        candidates = [
+            s for s in signals if s.direction > 0 and s.direction * s.strength * s.confidence >= self.min_signal
+        ]
         if not candidates:
             return PortfolioTarget((), numeraire)
         scores = [s.direction * s.strength * s.confidence for s in candidates]
@@ -37,5 +39,7 @@ class LongOnlySignalPortfolioConstructor:
             if next_uncapped == uncapped:
                 break
             uncapped = next_uncapped
-        allocations = tuple(TargetAllocation(signal.instrument, weight) for signal, weight in zip(candidates, capped, strict=True))
+        allocations = tuple(
+            TargetAllocation(signal.instrument, weight) for signal, weight in zip(candidates, capped, strict=True)
+        )
         return PortfolioTarget(allocations, numeraire)
