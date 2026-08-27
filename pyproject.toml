@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "trading-platform"
+version = "0.1.0"
+description = "Multi-venue, multi-asset, multi-strategy trading platform with NautilusTrader and LLM intelligence"
+requires-python = ">=3.12,<3.15"
+dependencies = [
+  "nautilus-trader==1.231.0",
+  "fastapi==0.116.1",
+  "uvicorn[standard]==0.35.0",
+  "pydantic==2.11.7",
+  "pydantic-settings==2.10.1",
+  "sqlalchemy==2.0.43",
+  "asyncpg==0.30.0",
+  "alembic==1.16.5",
+  "httpx==0.28.1",
+  "pyyaml==6.0.2",
+  "orjson==3.11.2",
+  "structlog==25.4.0",
+  "prometheus-client==0.22.1",
+  "numpy==2.3.2",
+  "pandas==2.3.3",
+]
+
+[project.optional-dependencies]
+research = ["scipy==1.16.1", "statsmodels==0.14.5", "scikit-learn==1.7.1"]
+intelligence = ["qdrant-client==1.15.1", "feedparser==6.0.11"]
+dev = ["pytest==8.4.1", "pytest-asyncio==1.1.0", "ruff==0.12.10", "mypy==1.17.1"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["apps", "domain", "trading", "research", "intelligence", "storage", "platform_core", "scripts"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]

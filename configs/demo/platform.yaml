@@ -1,0 +1,29 @@
+mode: demo
+trading:
+  venue: BYBIT
+  product_type: SPOT
+  instruments: [BTCUSDT-SPOT.BYBIT]
+  bar_type: 15-MINUTE-LAST-EXTERNAL
+objective:
+  numeraire: BTC
+  benchmark: BUY_AND_HOLD_BTC
+portfolio:
+  reserve_weight: 0.10
+  max_asset_weight: 0.35
+  min_signal: 0.05
+risk:
+  max_total_invested: 0.90
+  max_single_asset_weight: 0.35
+  kill_switch_drawdown: 0.10
+strategies:
+  trend_following: {enabled: true, weight: 1.0, fast: 20, slow: 100, min_separation: 0.002}
+  mean_reversion: {enabled: true, weight: 0.7, window: 50, entry_z: 2.0}
+  momentum: {enabled: true, weight: 0.8, lookback: 20, threshold: 0.01}
+  breakout: {enabled: true, weight: 0.5, lookback: 20, buffer: 0.001}
+regime:
+  enabled: true
+  vol_high: 0.03
+  trend_threshold: 0.02
+intelligence:
+  enabled: false
+  weight: 0.25

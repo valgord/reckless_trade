@@ -1,0 +1,124 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-trading}
+      POSTGRES_USER: ${POSTGRES_USER:-trading}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-trading} -d ${POSTGRES_DB:-trading}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  trader:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
+    env_file: .env
+    environment:
+      TRADING_MODE: ${TRADING_MODE:-demo}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./configs:/app/configs:ro
+      - ./data:/app/data
+    restart: unless-stopped
+
+  control-api:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
+    env_file: .env
+    command: ["uvicorn", "apps.control_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports: ["8000:8000"]
+    volumes:
+      - ./configs:/app/configs:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  intelligence:
+    profiles: ["intelligence"]
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
+    env_file: .env
+    command: ["uvicorn", "apps.intelligence.main:app", "--host", "0.0.0.0", "--port", "8010"]
+    ports: ["8010:8010"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8010/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    restart: unless-stopped
+
+  news-worker:
+    profiles: ["intelligence"]
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
+    env_file: .env
+    command: ["python", "-m", "apps.news_worker.main"]
+    restart: unless-stopped
+
+  ollama:
+    profiles: ["intelligence"]
+    image: ollama/ollama:rocm
+    devices:
+      - /dev/kfd:/dev/kfd
+      - /dev/dri:/dev/dri
+    group_add:
+      - video
+    volumes:
+      - ollama_data:/root/.ollama
+    ports: ["11434:11434"]
+    restart: unless-stopped
+
+  qdrant:
+    profiles: ["intelligence"]
+    image: qdrant/qdrant:v1.15.1
+    volumes:
+      - qdrant_data:/qdrant/storage
+    ports: ["6333:6333"]
+    restart: unless-stopped
+
+  prometheus:
+    profiles: ["observability"]
+    image: prom/prometheus:v3.5.0
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports: ["9090:9090"]
+    restart: unless-stopped
+
+  grafana:
+    profiles: ["observability"]
+    image: grafana/grafana:12.1.1
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports: ["3000:3000"]
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  ollama_data:
+  qdrant_data:
+  prometheus_data:
+  grafana_data:
