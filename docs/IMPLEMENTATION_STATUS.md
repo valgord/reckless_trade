@@ -31,6 +31,15 @@
   and preserved publication, first-seen, analysis-start, completion and strategy-availability timestamps.
 - PostgreSQL-hydrated Qdrant similarity candidates and a costed M7 A/B replay with an explicit LLM-disabled arm,
   minimum coverage gates and future-information blocking.
+- Trade-level M4/M5 gross/net attribution plus public Bybit funding and replay-safe mark-price ingestion.
+- Delta-neutral BTC Spot/Perp carry simulation with funding, basis PnL, fees, slippage, monthly rebalancing,
+  margin/liquidation proxy, walk-forward selection, cost stress, bootstrap robustness and separate research/execution gates.
+- Mixed Bybit Spot+Linear Demo client configuration and an orderless carry readiness observer with startup
+  reconciliation, balance/open-order inspection, delta and notional guards, margin proxy and risk-reducing repair plans.
+- Exact-confirmation one-shot Demo carry executor with isolated 1x Linear configuration, equal-quantity paired market
+  orders, fill reconciliation, compensating unwind and an atomic strategy-ownership ledger.
+- Read-only Demo carry performance monitor with persisted entry fills, actual funding settlements, basis attribution,
+  actual opening fees, estimated closing fees and executable-price net PnL.
 - PostgreSQL audit models, Docker Compose, optional Qdrant, Prometheus/Grafana, backup/restore and CI.
 - Live trading lock and physically separate demo/live credential names.
 
@@ -40,5 +49,6 @@
 - No hard-coded live order sizing exists before instrument/account metadata is reconciled from Bybit.
 - The M7 machinery is validated, but the current report contains zero model analyses. No model quality or news alpha
   benefit is claimed until a sufficiently large replay-aligned event set exists.
-- Market making, statistical arbitrage and funding/basis strategies need L2/funding datasets and have contracts but are not represented by toy implementations.
+- Market making and statistical arbitrage still need L2/specialized datasets. Carry is research-only and has no
+  continuous autonomous order path; its one-shot Demo executor cannot use live credentials.
 - Production backtests use Nautilus BacktestNode; the local simple engine exists only for fast mathematical sanity checks.

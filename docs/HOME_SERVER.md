@@ -19,6 +19,7 @@ TRADING_MODE=demo
 ALLOW_LIVE_TRADING=false
 RUN_NAUTILUS_NODE=false
 ENABLE_DEMO_STRATEGY=false
+ENABLE_CARRY_OBSERVER=false
 NEWS_FORWARD_TO_INTELLIGENCE=false
 OLLAMA_MODEL=qwen3:14b
 ```
@@ -91,3 +92,61 @@ curl -fsS http://localhost:8000/research/m7
 
 Only after inspecting structured analyses, timestamps and the M7 report should news ingestion and forwarding be enabled.
 Demo order submission remains a separate later decision.
+
+## 6. Reproduce M7.5 research
+
+Public Spot, funding and mark-price data need no API key. From the project virtual environment run:
+
+```bash
+make m75-data
+make m75
+curl -fsS http://localhost:8000/research/m75
+```
+
+The download starts after the known February 2022 Bybit Spot-history gap and may take several minutes. M7.5 never
+submits an order; even a passing research gate leaves derivative execution and live trading disabled.
+
+## 7. Observe carry readiness in Demo
+
+After `home-validate` succeeds, start the separate Spot+Linear observer and inspect its state:
+
+```bash
+make demo-carry-observe
+curl -fsS http://localhost:8000/runtime/carry
+make demo-pause
+```
+
+Use a dedicated Demo account without unrelated BTC holdings or BTCUSDT Linear positions. The observer emits an advisory
+pair or risk-reducing repair plan, but contains no order-submission path and always reports `orders_enabled=false`.
+The carry-only Demo cap is 100 USDT per leg with a 50 USDT reserve. This is enough for the current `0.001 BTC` Linear
+minimum; the ordinary Demo/order-smoke cap remains 10 USDT and live settings are not changed.
+
+## 8. One-shot Demo pair
+
+Only after `/runtime/carry` reports `flat_ready`, open one virtual pair with the exact confirmation:
+
+```bash
+make demo-carry-open CONFIRM=I_UNDERSTAND_THIS_PLACES_DEMO_CARRY_ORDERS
+make demo-carry-observe
+curl -fsS http://localhost:8000/runtime/carry
+```
+
+Close only the quantity recorded in the ownership ledger with:
+
+```bash
+make demo-carry-close CONFIRM=I_UNDERSTAND_THIS_PLACES_DEMO_CARRY_ORDERS
+```
+
+Both commands reconcile fills and compensate incomplete pairs. They affect Demo only; automatic execution and live
+trading remain disabled.
+
+Keep the pair observer and read-only performance monitor running, or request a one-time report:
+
+```bash
+make demo-carry-observe
+make demo-carry-report
+curl -fsS http://localhost:8000/runtime/carry
+```
+
+The report separates basis PnL, actual funding and fees. Treat `estimated_net_pnl_usdt` as mark-to-market only until a
+confirmed paired close establishes the realized result.

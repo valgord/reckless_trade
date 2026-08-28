@@ -23,6 +23,7 @@ services:
       TRADING_MODE: ${TRADING_MODE:-demo}
       RUN_NAUTILUS_NODE: ${RUN_NAUTILUS_NODE:-false}
       ENABLE_DEMO_STRATEGY: ${ENABLE_DEMO_STRATEGY:-false}
+      ENABLE_CARRY_OBSERVER: ${ENABLE_CARRY_OBSERVER:-false}
     depends_on:
       postgres:
         condition: service_healthy
@@ -41,6 +42,7 @@ services:
       TRADING_MODE: ${TRADING_MODE:-demo}
       RUN_NAUTILUS_NODE: ${RUN_NAUTILUS_NODE:-false}
       ENABLE_DEMO_STRATEGY: ${ENABLE_DEMO_STRATEGY:-false}
+      ENABLE_CARRY_OBSERVER: ${ENABLE_CARRY_OBSERVER:-false}
       NEWS_ENABLED: ${NEWS_ENABLED:-false}
       NEWS_FORWARD_TO_INTELLIGENCE: ${NEWS_FORWARD_TO_INTELLIGENCE:-false}
     ports: ["8000:8000"]
@@ -55,6 +57,19 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    restart: unless-stopped
+
+  carry-monitor:
+    profiles: ["carry"]
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
+    env_file: .env
+    command: ["python", "-m", "apps.trader.carry_monitor", "--watch", "--poll-seconds", "60"]
+    environment:
+      TRADING_MODE: demo
+    volumes:
+      - ./data:/app/data
     restart: unless-stopped
 
   intelligence:

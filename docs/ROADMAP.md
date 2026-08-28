@@ -48,6 +48,35 @@ hydration, availability-safe Qdrant candidates and a costed LLM-disabled A/B rep
 covered 35,039 BTC bars but had no LLM analyses, so it correctly failed the minimum-coverage gate. Model evaluation
 and any news-alpha promotion remain pending; forwarding to the trading path stays disabled.
 
+## M7.5 - Fiat alpha discovery
+Directional trade attribution, public funding/mark-price ingestion and delta-neutral Spot/Perp carry research.
+
+Baseline complete on 4,993 funding settlements from February 2022: directional alpha was negative before costs, while
+the always-on carry candidate returned 12.78% after modeled costs, 7.71% across chained walk-forward test windows and
+11.25% at triple costs. The research gate passed, but the execution gate remains closed until Demo-only derivative
+execution, margin controls, atomic leg handling, reconciliation and forward testing exist.
+
+## M7.6 - Carry Demo readiness
+Spot+Linear client configuration, startup reconciliation and an orderless carry observer are implemented. The guard
+fails closed on missing quotes, incomplete reconciliation or open orders; detects invalid direction, notional excess,
+delta mismatch and low margin; and produces risk-reducing repair guidance (`reduce_only` only on Linear). Demo order submission remains the next gated
+increment after the observer is verified against a dedicated Demo account.
+
+The first live Demo readiness check correctly blocked because 0.001 BTC required roughly 80 USDT per leg above the
+original 10 USDT cap. The explicitly approved carry-only Demo cap is now 100 USDT per leg; ordinary Demo smoke limits
+remain 10 USDT and live configuration remains unchanged.
+
+## M7.7 - Gated Demo pair execution
+A one-shot, exact-confirmation executor now configures isolated `1x` Linear trading, validates a flat reconciled state,
+submits equal Spot/Linear market legs, waits for both fills and atomically updates carry ownership. Partial fills,
+rejects and timeouts invoke compensating orders for confirmed exposure. Continuous automatic opening remains disabled;
+the first virtual pair requires a separately confirmed operator action.
+
+## M7.8 - Demo carry performance
+Persist the actual entry fills, collect private funding settlements and attribute the open pair's USDT result to basis,
+funding and fees. Report both pre-exit PnL and executable-price net PnL after estimated closing fees. The monitor is
+read-only; a final realized result still requires a separately confirmed paired close.
+
 ## M8 - Multi-strategy and regime allocation
 Strategy portfolio, regime-dependent weights, performance attribution per alpha/strategy.
 

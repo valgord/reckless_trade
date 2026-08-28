@@ -7,7 +7,13 @@ from types import SimpleNamespace
 import pytest
 
 from research.backtests.nautilus_runner import build_run_config
-from research.data.bybit_catalog import last_completed_bar_end, parse_bar_interval, validate_bar_series
+from research.data.bybit_catalog import (
+    bar_time_grid_gaps,
+    last_completed_bar_end,
+    parse_bar_interval,
+    split_contiguous_bars,
+    validate_bar_series,
+)
 
 
 def test_bar_interval_and_completed_boundary() -> None:
@@ -22,8 +28,26 @@ def test_bar_validation_rejects_time_grid_gap() -> None:
     step = 15 * 60 * 1_000_000_000
     bars = [SimpleNamespace(ts_event=step), SimpleNamespace(ts_event=step * 3)]
 
-    with pytest.raises(ValueError, match="time-grid gaps"):
+    assert bar_time_grid_gaps(bars, timedelta(minutes=15)) == [(step, step * 3)]
+    with pytest.raises(ValueError, match=r"time-grid gaps.*1 missing bars"):
         validate_bar_series(bars, timedelta(minutes=15))
+
+
+def test_fresh_bars_are_split_around_existing_catalog_intervals() -> None:
+    step = 15 * 60 * 1_000_000_000
+    bars = [
+        SimpleNamespace(ts_event=step),
+        SimpleNamespace(ts_event=step * 2),
+        SimpleNamespace(ts_event=step * 5),
+        SimpleNamespace(ts_event=step * 6),
+    ]
+
+    segments = split_contiguous_bars(bars, timedelta(minutes=15))
+
+    assert [[bar.ts_event for bar in segment] for segment in segments] == [
+        [step, step * 2],
+        [step * 5, step * 6],
+    ]
 
 
 def test_backtest_run_config_targets_catalog_bar_type() -> None:

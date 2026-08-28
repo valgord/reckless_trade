@@ -12,6 +12,7 @@ def build_bybit_client_configs(mode: str, instrument_ids: Iterable[str]):
     if mode == "live" and os.getenv("ALLOW_LIVE_TRADING", "false").lower() != "true":
         raise RuntimeError("Live trading is locked. Set ALLOW_LIVE_TRADING=true explicitly.")
 
+    instrument_ids = tuple(instrument_ids)
     api_key_name = "BYBIT_DEMO_API_KEY" if mode == "demo" else "BYBIT_API_KEY"
     api_secret_name = "BYBIT_DEMO_API_SECRET" if mode == "demo" else "BYBIT_API_SECRET"
     api_key, api_secret = os.getenv(api_key_name), os.getenv(api_secret_name)
@@ -25,20 +26,38 @@ def build_bybit_client_configs(mode: str, instrument_ids: Iterable[str]):
         BybitProductType,
     )
     from nautilus_trader.config import InstrumentProviderConfig
+    from nautilus_trader.core import nautilus_pyo3
     from nautilus_trader.model.identifiers import InstrumentId
 
     environment = BybitEnvironment.DEMO if mode == "demo" else BybitEnvironment.MAINNET
     provider = InstrumentProviderConfig(
         load_ids=frozenset(InstrumentId.from_str(value) for value in instrument_ids),
     )
+    product_types = []
+    if any("-SPOT." in value for value in instrument_ids):
+        product_types.append(BybitProductType.SPOT)
+    if any("-LINEAR." in value for value in instrument_ids):
+        product_types.append(BybitProductType.LINEAR)
+    supported = all("-SPOT." in value or "-LINEAR." in value for value in instrument_ids)
+    if not product_types or not supported:
+        raise ValueError("Bybit instruments must use a supported SPOT or LINEAR product suffix")
+
     common = {
         "api_key": api_key,
         "api_secret": api_secret,
         "environment": environment,
         "instrument_provider": provider,
-        "product_types": (BybitProductType.SPOT,),
+        "product_types": tuple(product_types),
     }
-    return BybitDataClientConfig(**common), BybitExecClientConfig(**common)
+    execution = {}
+    linear_symbols = [value.split(".", 1)[0] for value in instrument_ids if "-LINEAR." in value]
+    if linear_symbols:
+        execution = {
+            "futures_leverages": {symbol: 1 for symbol in linear_symbols},
+            "position_mode": {symbol: nautilus_pyo3.BybitPositionMode.MERGED_SINGLE for symbol in linear_symbols},
+            "margin_mode": nautilus_pyo3.BybitMarginMode.ISOLATED_MARGIN,
+        }
+    return BybitDataClientConfig(**common), BybitExecClientConfig(**common, **execution)
 
 
 def build_bybit_trading_node(

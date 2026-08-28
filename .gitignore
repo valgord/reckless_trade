@@ -19,5 +19,7 @@ data/catalog/*
 data/news/*
 !data/news/.gitkeep
 data/runtime/*
+data/carry/*
+!data/carry/.gitkeep
 backtest-results/
 research-results/

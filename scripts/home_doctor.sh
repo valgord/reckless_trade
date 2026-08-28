@@ -47,6 +47,12 @@ fi
 
 [[ $(value_for TRADING_MODE) == "demo" ]] && pass "Trading mode is demo" || fail "TRADING_MODE must be demo"
 [[ $(value_for ALLOW_LIVE_TRADING) == "false" ]] && pass "Live trading is locked" || fail "ALLOW_LIVE_TRADING must be false"
+[[ $(value_for RUN_NAUTILUS_NODE) == "false" ]] \
+    && pass "Nautilus runtime is initially disabled" \
+    || fail "RUN_NAUTILUS_NODE must be false for initial validation"
+[[ $(value_for ENABLE_CARRY_OBSERVER) == "false" ]] \
+    && pass "Carry observer is initially disabled" \
+    || fail "ENABLE_CARRY_OBSERVER must be false for initial validation"
 [[ $(value_for NEWS_FORWARD_TO_INTELLIGENCE) == "false" ]] \
     && pass "Automatic news forwarding is locked" \
     || fail "NEWS_FORWARD_TO_INTELLIGENCE must be false for initial validation"

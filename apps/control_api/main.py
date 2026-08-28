@@ -46,6 +46,7 @@ def status() -> dict:
             "instruments": settings.instruments,
             "numeraire": settings.numeraire,
             "nautilus_node_enabled": os.getenv("RUN_NAUTILUS_NODE", "false").lower() == "true",
+            "carry_observer_enabled": os.getenv("ENABLE_CARRY_OBSERVER", "false").lower() == "true",
         }
     except Exception as exc:
         return {"mode": mode, "configuration_error": str(exc)}
@@ -83,6 +84,37 @@ def demo_strategy_status() -> dict:
             result["last_status"] = json.loads(status_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             result["status_error"] = type(exc).__name__
+    return result
+
+
+@app.get("/runtime/carry")
+def carry_runtime_status() -> dict:
+    status_path = Path(os.getenv("CARRY_STATUS_PATH", "/app/data/runtime/carry-observer.json"))
+    pair_status_path = Path(os.getenv("CARRY_PAIR_STATUS_PATH", "/app/data/runtime/carry-pair.json"))
+    performance_path = Path(os.getenv("CARRY_PERFORMANCE_PATH", "/app/data/runtime/carry-performance.json"))
+    result = {
+        "observer_enabled": os.getenv("ENABLE_CARRY_OBSERVER", "false").lower() == "true",
+        "orders_enabled": False,
+        "execution_gate": "one_shot_confirmation_required",
+        "last_status": None,
+        "last_pair": None,
+        "performance": None,
+    }
+    if status_path.exists():
+        try:
+            result["last_status"] = json.loads(status_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            result["status_error"] = type(exc).__name__
+    if pair_status_path.exists():
+        try:
+            result["last_pair"] = json.loads(pair_status_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            result["pair_status_error"] = type(exc).__name__
+    if performance_path.exists():
+        try:
+            result["performance"] = json.loads(performance_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            result["performance_status_error"] = type(exc).__name__
     return result
 
 
@@ -133,6 +165,17 @@ def m5_research_status() -> dict:
 @app.get("/research/m7")
 def m7_research_status() -> dict:
     report_path = Path(os.getenv("M7_RESEARCH_REPORT_PATH", "/app/data/runtime/m7-research.json"))
+    if not report_path.exists():
+        return {"status": "not_run", "report": None}
+    try:
+        return {"status": "available", "report": json.loads(report_path.read_text(encoding="utf-8"))}
+    except (OSError, json.JSONDecodeError) as exc:
+        return {"status": "invalid", "report": None, "status_error": type(exc).__name__}
+
+
+@app.get("/research/m75")
+def m75_research_status() -> dict:
+    report_path = Path(os.getenv("M75_RESEARCH_REPORT_PATH", "/app/data/runtime/m75-research.json"))
     if not report_path.exists():
         return {"status": "not_run", "report": None}
     try:

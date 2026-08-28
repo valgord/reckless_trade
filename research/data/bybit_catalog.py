@@ -31,18 +31,43 @@ def parse_bar_interval(bar_spec: str) -> timedelta:
     return timedelta(**{units[unit]: step})
 
 
+def bar_time_grid_gaps(bars: list[Any], interval: timedelta) -> list[tuple[int, int]]:
+    expected_ns = int(interval.total_seconds() * 1_000_000_000)
+    timestamps = [int(bar.ts_event) for bar in bars]
+    return [
+        (left, right) for left, right in zip(timestamps, timestamps[1:], strict=False) if right - left != expected_ns
+    ]
+
+
+def split_contiguous_bars(bars: list[Any], interval: timedelta) -> list[list[Any]]:
+    if not bars:
+        return []
+    expected_ns = int(interval.total_seconds() * 1_000_000_000)
+    segments = [[bars[0]]]
+    for bar in bars[1:]:
+        if int(bar.ts_event) - int(segments[-1][-1].ts_event) != expected_ns:
+            segments.append([])
+        segments[-1].append(bar)
+    return segments
+
+
 def validate_bar_series(bars: list[Any], interval: timedelta) -> None:
     if not bars:
         raise ValueError("No bars returned for the requested range")
-    expected_ns = int(interval.total_seconds() * 1_000_000_000)
     timestamps = [int(bar.ts_event) for bar in bars]
     if timestamps != sorted(set(timestamps)):
         raise ValueError("Bars must be strictly ordered and unique")
-    gaps = [
-        (left, right) for left, right in zip(timestamps, timestamps[1:], strict=False) if right - left != expected_ns
-    ]
+    gaps = bar_time_grid_gaps(bars, interval)
     if gaps:
-        raise ValueError(f"Historical bars contain {len(gaps)} time-grid gaps")
+        expected_ns = int(interval.total_seconds() * 1_000_000_000)
+        left, right = gaps[0]
+        left_at = datetime.fromtimestamp(left / 1_000_000_000, tz=UTC).isoformat()
+        right_at = datetime.fromtimestamp(right / 1_000_000_000, tz=UTC).isoformat()
+        missing = max(0, (right - left) // expected_ns - 1)
+        raise ValueError(
+            f"Historical bars contain {len(gaps)} time-grid gaps; "
+            f"first gap is {left_at} to {right_at} ({missing} missing bars)"
+        )
 
 
 def last_completed_bar_end(now: datetime, interval: timedelta) -> datetime:
@@ -109,6 +134,32 @@ async def update_bybit_catalog(
             if earliest <= start or len(batch) < 1_000:
                 break
             cursor_end = earliest - timedelta(microseconds=1)
+
+        expected_ns = int(interval.total_seconds() * 1_000_000_000)
+        for _ in range(3):
+            ordered = [collected[key] for key in sorted(collected)]
+            gaps = bar_time_grid_gaps(ordered, interval)
+            if not gaps:
+                break
+            added = 0
+            for left, right in gaps:
+                repair_start = datetime.fromtimestamp((left + expected_ns) / 1_000_000_000, tz=UTC)
+                repair_end = datetime.fromtimestamp(right / 1_000_000_000, tz=UTC)
+                batch = await client.request_bars(
+                    product_type=product_type,
+                    bar_type=pyo3_bar_type,
+                    start=repair_start,
+                    end=repair_end,
+                    limit=1_000,
+                    timestamp_on_close=True,
+                )
+                for bar in batch:
+                    timestamp = int(bar.ts_event)
+                    if timestamp not in collected:
+                        collected[timestamp] = bar
+                        added += 1
+            if not added:
+                break
     finally:
         client.cancel_all_requests()
 
@@ -127,8 +178,8 @@ async def update_bybit_catalog(
     existing = catalog.bars(bar_types=[bar_type])
     existing_timestamps = {int(bar.ts_event) for bar in existing}
     fresh = [bar for bar in bars if int(bar.ts_event) not in existing_timestamps]
-    if fresh:
-        catalog.write_data(fresh)
+    for segment in split_contiguous_bars(fresh, interval):
+        catalog.write_data(segment)
 
     total_bars = catalog.bars(bar_types=[bar_type])
     validate_bar_series(total_bars, interval)

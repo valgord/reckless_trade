@@ -35,3 +35,17 @@ demo_runtime:
     max_order_notional_usdt: 10
     max_order_submit_rate: 1/00:01:00
     max_order_modify_rate: 2/00:01:00
+carry_runtime:
+  spot_instrument: BTCUSDT-SPOT.BYBIT
+  perp_instrument: BTCUSDT-LINEAR.BYBIT
+  target_notional_usdt: 100
+  minimum_free_reserve_usdt: 50
+  maintenance_margin_rate: 0.05
+  minimum_margin_ratio: 3.0
+  maximum_quantity_mismatch_fraction: 0.02
+  status_path: data/runtime/carry-observer.json
+  ownership_path: data/runtime/carry-ownership.json
+  risk:
+    max_order_notional_usdt: 100
+    max_order_submit_rate: 1/00:01:00
+    max_order_modify_rate: 2/00:01:00

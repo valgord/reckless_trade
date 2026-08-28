@@ -176,6 +176,78 @@ model pull. The report is written to `data/runtime/m7-research.json` and exposed
 The gate requires at least 100 analysed events and 100 active event-bars; insufficient coverage never promotes the
 news alpha. `NEWS_FORWARD_TO_INTELLIGENCE=false` remains the safe ingestion default.
 
+## M7.5 fiat alpha discovery
+
+M7.5 separates the failed directional strategy's gross return from its cost drag, then evaluates a delta-neutral BTC
+carry hypothesis: long equal-quantity Spot and short perpetual, collecting positive funding while largely cancelling
+BTC price exposure. Download the longest continuous Bybit dataset used by the experiment and reproduce the report:
+
+```bash
+make m75-data
+make m75
+```
+
+The dataset starts at `2022-02-05T07:00:00Z`, immediately after a verified four-day gap in Bybit's public Spot
+history; no prices are synthesized. The report is written to `data/runtime/m75-research.json` and exposed at
+`GET /research/m75`. The initial 4.5-year run passed its research gate, including 21/24 positive 60-day OOS folds and
+positive return at triple modeled costs. Its execution gate remains closed: perpetual execution, isolated-margin
+controls, leg-risk handling and reconciliation are not implemented, and no result is a promise of future profit.
+
+## M7.6 carry Demo observer
+
+The first runtime step remains orderless. It loads both `BTCUSDT-SPOT.BYBIT` and `BTCUSDT-LINEAR.BYBIT`, relies on
+Nautilus startup reconciliation, watches both quotes and evaluates balances, open orders, delta mismatch, notional cap
+and a conservative margin-ratio proxy:
+
+```bash
+make demo-carry-observe
+curl -fsS http://localhost:8000/runtime/carry
+make demo-pause
+```
+
+The status may be `blocked`, `flat_ready`, `hedged`, `repair_required` or `close_required`. Suggested leg actions are
+advisory only: `orders_enabled` and the execution gate remain unconditionally locked in this stage. Use a dedicated
+Demo account because the observer treats all visible BTC and BTCUSDT Linear exposure as relevant to reconciliation.
+The guard also reads live instrument constraints. With Bybit's current BTCUSDT Linear minimum of `0.001 BTC`, the
+carry-only Demo cap is 100 USDT per leg, while the ordinary Demo runtime and order smoke retain their 10 USDT limits.
+At current prices the shared minimum rounds the advisory pair to about 80 USDT per leg. Live configuration is unchanged.
+
+## M7.7 gated Demo pair
+
+The pair executor is a one-shot command, not part of the continuous observer. It configures BTCUSDT Linear as isolated
+margin, one-way mode and `1x`; refuses non-flat ownership, unexpected positions or open orders; submits equal Spot and
+Linear market quantities; and commits the ownership ledger only after both full fills. A partial/rejected/timed-out
+pair triggers compensating market orders for every confirmed fill.
+
+Opening and closing both require the exact explicit confirmation:
+
+```bash
+make demo-carry-open CONFIRM=I_UNDERSTAND_THIS_PLACES_DEMO_CARRY_ORDERS
+make demo-carry-close CONFIRM=I_UNDERSTAND_THIS_PLACES_DEMO_CARRY_ORDERS
+```
+
+The sanitized result is stored in `data/runtime/carry-pair.json` and returned as `last_pair` by
+`GET /runtime/carry`. These commands can place virtual Bybit Demo orders; neither is used by normal startup, and live
+credentials/configuration remain outside this path.
+
+## M7.8 Demo carry performance
+
+The read-only performance monitor recovers actual entry fills and fees by the pair's Bybit `orderLinkId`, reads actual
+funding settlements from the Unified account transaction log, marks both legs at executable Spot bid/Linear ask and
+estimates the cost of closing. It exposes basis PnL, funding, opening fees, estimated closing fees and estimated net
+USDT PnL without containing an order-submission method:
+
+```bash
+make demo-carry-report
+make demo-carry-observe
+curl -fsS http://localhost:8000/runtime/carry
+```
+
+The entry is persisted in `data/runtime/carry-cycle.json`, while the latest report is written to
+`data/runtime/carry-performance.json`. `net_pnl_before_exit_costs_usdt` is not a realizable result;
+`estimated_net_pnl_usdt` also subtracts estimated exit fees and uses executable exit prices. Only a completed paired
+close can establish final realized PnL.
+
 ## Safety
 
 - Never grant withdrawal permission to the bot key.

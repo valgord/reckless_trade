@@ -12,10 +12,12 @@ import pytest
 from apps.control_api.main import (
     backtest_status,
     bybit_status,
+    carry_runtime_status,
     m3_research_status,
     m4_research_status,
     m5_research_status,
     m7_research_status,
+    m75_research_status,
     news_ingestion_status,
 )
 from apps.trader import bybit_smoke
@@ -145,6 +147,30 @@ assert {value.value for value in data.instrument_provider.load_ids} == {'BTCUSDT
 """
     env = os.environ.copy()
     env.update({"BYBIT_DEMO_API_KEY": "key", "BYBIT_DEMO_API_SECRET": "secret"})
+    result = subprocess.run([sys.executable, "-c", script], env=env, text=True, capture_output=True, timeout=10)
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_builds_mixed_spot_and_linear_demo_client_configs():
+    script = """
+from apps.trader.integrations.nautilus_bybit import build_bybit_client_configs
+data, execution = build_bybit_client_configs(
+    'demo',
+    ['BTCUSDT-SPOT.BYBIT', 'BTCUSDT-LINEAR.BYBIT'],
+)
+assert tuple(str(value) for value in data.product_types) == ('Spot', 'Linear')
+assert {value.value for value in data.instrument_provider.load_ids} == {
+    'BTCUSDT-SPOT.BYBIT', 'BTCUSDT-LINEAR.BYBIT'
+}
+assert tuple(str(value) for value in execution.product_types) == ('Spot', 'Linear')
+assert execution.futures_leverages == {'BTCUSDT-LINEAR': 1}
+assert str(execution.position_mode['BTCUSDT-LINEAR']) == 'MERGED_SINGLE'
+assert str(execution.margin_mode) == 'ISOLATED_MARGIN'
+"""
+    env = os.environ.copy()
+    env.update({"BYBIT_DEMO_API_KEY": "key", "BYBIT_DEMO_API_SECRET": "secret"})
+
     result = subprocess.run([sys.executable, "-c", script], env=env, text=True, capture_output=True, timeout=10)
 
     assert result.returncode == 0, result.stderr
@@ -298,6 +324,27 @@ def test_control_api_reads_backtest_report(monkeypatch, tmp_path):
     assert result == {"status": "available", "report": {"strategy_return": -0.1, "total_orders": 12}}
 
 
+def test_control_api_reads_locked_carry_observer_status(monkeypatch, tmp_path):
+    path = tmp_path / "carry.json"
+    performance_path = tmp_path / "carry-performance.json"
+    path.write_text(json.dumps({"status": "hedged", "orders_enabled": False}), encoding="utf-8")
+    performance_path.write_text(
+        json.dumps({"status": "monitoring", "performance": {"estimated_net_pnl_usdt": 0.01}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CARRY_STATUS_PATH", str(path))
+    monkeypatch.setenv("CARRY_PERFORMANCE_PATH", str(performance_path))
+    monkeypatch.setenv("ENABLE_CARRY_OBSERVER", "true")
+
+    result = carry_runtime_status()
+
+    assert result["observer_enabled"] is True
+    assert result["orders_enabled"] is False
+    assert result["execution_gate"] == "one_shot_confirmation_required"
+    assert result["last_status"]["status"] == "hedged"
+    assert result["performance"]["performance"]["estimated_net_pnl_usdt"] == 0.01
+
+
 def test_control_api_reads_m3_research_report(monkeypatch, tmp_path):
     path = tmp_path / "m3.json"
     path.write_text(json.dumps({"promotion": {"approved": False}, "trials_recorded": 63}), encoding="utf-8")
@@ -340,6 +387,17 @@ def test_control_api_reads_m7_research_report(monkeypatch, tmp_path):
 
     assert result["status"] == "available"
     assert result["report"]["gate"]["promoted"] is False
+
+
+def test_control_api_reads_m75_research_report(monkeypatch, tmp_path):
+    path = tmp_path / "m75.json"
+    path.write_text(json.dumps({"stage": "m7.5-fiat-alpha-discovery", "research_gate": True}), encoding="utf-8")
+    monkeypatch.setenv("M75_RESEARCH_REPORT_PATH", str(path))
+
+    result = m75_research_status()
+
+    assert result["status"] == "available"
+    assert result["report"]["stage"] == "m7.5-fiat-alpha-discovery"
 
 
 def test_control_api_reads_news_ingestion_health(monkeypatch, tmp_path):

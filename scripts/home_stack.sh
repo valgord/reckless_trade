@@ -51,7 +51,8 @@ case "${1:-}" in
         fi
         echo "PASS  qwen3:14b is available"
         curl -fsS --max-time 10 http://localhost:8000/runtime/demo-strategy | grep -Fq '"orders_enabled":false'
-        echo "PASS  Order submission is disabled"
+        curl -fsS --max-time 10 http://localhost:8000/runtime/carry | grep -Fq '"orders_enabled":false'
+        echo "PASS  Strategy and carry order submission are disabled"
         ;;
     m7)
         "${compose[@]}" --profile intelligence run --rm --no-deps intelligence \
