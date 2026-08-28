@@ -13,6 +13,8 @@ from apps.control_api.main import (
     backtest_status,
     bybit_status,
     carry_runtime_status,
+    carry_scanner_history,
+    carry_scanner_runtime_status,
     m3_research_status,
     m4_research_status,
     m5_research_status,
@@ -350,6 +352,42 @@ def test_control_api_reads_locked_carry_observer_status(monkeypatch, tmp_path):
     assert result["last_status"]["status"] == "hedged"
     assert result["performance"]["performance"]["estimated_net_pnl_usdt"] == 0.01
     assert result["alerts"]["automatic_actions_enabled"] is False
+
+
+def test_control_api_reads_orderless_carry_scanner_status(monkeypatch, tmp_path):
+    path = tmp_path / "carry-scanner.json"
+    path.write_text(
+        json.dumps({"status": "available", "orders_enabled": False, "candidates": [{"symbol": "ETHUSDT"}]}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CARRY_SCANNER_STATUS_PATH", str(path))
+
+    result = carry_scanner_runtime_status()
+
+    assert result["status"] == "available"
+    assert result["orders_enabled"] is False
+    assert result["candidates"][0]["symbol"] == "ETHUSDT"
+
+
+def test_control_api_reads_carry_scanner_history(monkeypatch, tmp_path):
+    from storage.carry_scanner_history import record_carry_scan
+
+    path = tmp_path / "history.sqlite3"
+    record_carry_scan(
+        path,
+        {
+            "status": "available",
+            "updated_at": "2026-08-28T09:00:00+00:00",
+            "universe": {},
+            "candidates": [],
+        },
+    )
+    monkeypatch.setenv("CARRY_SCANNER_HISTORY_DB", str(path))
+
+    result = carry_scanner_history(limit=10)
+
+    assert result["status"] == "available"
+    assert result["observations"] == []
 
 
 def test_control_api_reads_m3_research_report(monkeypatch, tmp_path):

@@ -9,6 +9,7 @@ from urllib.parse import urlencode
 import httpx
 
 BYBIT_DEMO_REST_URL = "https://api-demo.bybit.com"
+BYBIT_PUBLIC_REST_URL = "https://api.bybit.com"
 
 
 class BybitDemoRestError(RuntimeError):
@@ -20,7 +21,52 @@ def sign_bybit_query(api_secret: str, timestamp_ms: int, api_key: str, recv_wind
     return hmac.new(api_secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
 
 
-class BybitDemoReadClient:
+class BybitPublicRestClient:
+    """Small public GET-only Bybit V5 client."""
+
+    def __init__(
+        self,
+        *,
+        base_url: str = BYBIT_PUBLIC_REST_URL,
+        timeout_seconds: float = 20.0,
+        client: httpx.AsyncClient | None = None,
+    ) -> None:
+        self._owns_client = client is None
+        self.client = client or httpx.AsyncClient(base_url=base_url, timeout=timeout_seconds)
+
+    async def close(self) -> None:
+        if self._owns_client:
+            await self.client.aclose()
+
+    async def get_public(self, path: str, params: dict[str, Any]) -> dict[str, Any]:
+        response = await self.client.get(path, params=params)
+        return self._validated(response)
+
+    async def get_public_pages(self, path: str, params: dict[str, Any]) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        cursor = None
+        while True:
+            page_params = dict(params)
+            if cursor:
+                page_params["cursor"] = cursor
+            payload = await self.get_public(path, page_params)
+            result = payload.get("result", {})
+            rows.extend(result.get("list", []))
+            next_cursor = result.get("nextPageCursor")
+            if not next_cursor or next_cursor == cursor:
+                return rows
+            cursor = next_cursor
+
+    @staticmethod
+    def _validated(response: httpx.Response) -> dict[str, Any]:
+        response.raise_for_status()
+        payload = response.json()
+        if int(payload.get("retCode", -1)) != 0:
+            raise BybitDemoRestError(f"Bybit returned {payload.get('retCode')}: {payload.get('retMsg')}")
+        return payload
+
+
+class BybitDemoReadClient(BybitPublicRestClient):
     """Small GET-only client for Demo endpoints not exposed by the Nautilus adapter."""
 
     def __init__(
@@ -33,19 +79,10 @@ class BybitDemoReadClient:
         timeout_seconds: float = 20.0,
         client: httpx.AsyncClient | None = None,
     ) -> None:
+        super().__init__(base_url=base_url, timeout_seconds=timeout_seconds, client=client)
         self.api_key = api_key
         self.api_secret = api_secret
         self.recv_window_ms = recv_window_ms
-        self._owns_client = client is None
-        self.client = client or httpx.AsyncClient(base_url=base_url, timeout=timeout_seconds)
-
-    async def close(self) -> None:
-        if self._owns_client:
-            await self.client.aclose()
-
-    async def get_public(self, path: str, params: dict[str, Any]) -> dict[str, Any]:
-        response = await self.client.get(path, params=params)
-        return self._validated(response)
 
     async def get_private(self, path: str, params: dict[str, Any]) -> dict[str, Any]:
         query = urlencode(sorted((key, str(value)) for key, value in params.items() if value is not None))
@@ -76,11 +113,3 @@ class BybitDemoReadClient:
             if not next_cursor or next_cursor == cursor:
                 return rows
             cursor = next_cursor
-
-    @staticmethod
-    def _validated(response: httpx.Response) -> dict[str, Any]:
-        response.raise_for_status()
-        payload = response.json()
-        if int(payload.get("retCode", -1)) != 0:
-            raise BybitDemoRestError(f"Bybit Demo returned {payload.get('retCode')}: {payload.get('retMsg')}")
-        return payload

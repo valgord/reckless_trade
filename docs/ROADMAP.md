@@ -80,7 +80,17 @@ read-only; a final realized result still requires a separately confirmed paired 
 ## M7.9 - Alerts and manual approval
 Watch observer/performance freshness and deterministic risk states, emit change-deduplicated alerts and optionally use
 the local 14B model to explain them. The LLM cannot alter severity, choose an execution action or access credentials.
-Pair repair/close remains a one-shot operator-confirmed command; continuous autonomous execution stays disabled.
+Its structured response is accepted only when the echoed state, position phase and alert codes exactly match the
+deterministic input. Pair repair/close remains a one-shot operator-confirmed command; continuous autonomous execution
+stays disabled.
+
+## M7.10 - Multi-pair carry discovery
+
+Continuously scan the public Bybit USDT Spot/Linear intersection and rank a bounded liquid universe using executable
+top-of-book prices, recent funding stability, minimum order constraints and explicit round-trip fees. This stage is
+observation-only: no candidate can create an execution intent or receive exchange credentials. Multi-pair ownership,
+portfolio limits and Demo execution remain separate future gates. Candidate history is stored locally for trend
+analysis, and Telegram emits a deduplicated review notice only when a symbol newly passes every deterministic filter.
 
 ## M8 - Multi-strategy and regime allocation
 Strategy portfolio, regime-dependent weights, performance attribution per alpha/strategy.

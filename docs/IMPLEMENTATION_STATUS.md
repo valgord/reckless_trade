@@ -40,8 +40,13 @@
   orders, fill reconciliation, compensating unwind and an atomic strategy-ownership ledger.
 - Read-only Demo carry performance monitor with persisted entry fills, actual funding settlements, basis attribution,
   actual opening fees, estimated closing fees and executable-price net PnL.
-- Deterministic carry alerts for stale state, reconciliation, leg risk, funding and PnL thresholds, with an optional
-  advisory-only local Ollama explanation, change-only webhook and explicit human confirmation policy.
+- Deterministic carry alerts for stale state, reconciliation, leg risk, funding and PnL thresholds, with optional
+  Telegram/webhook delivery and an advisory-only local Ollama explanation. The model must echo the authoritative
+  state, position phase and alert codes; mismatched prose is rejected before notification.
+- Read-only multi-pair Bybit carry scanner over common USDT Spot/Linear instruments, with liquidity, top-of-book,
+  minimum-notional, recent-funding stability, fee and configurable holding-horizon filters. It has no credentials or
+  execution path and only ranks observation candidates. Compact 90-day SQLite history and restart-safe Telegram
+  notifications track only new transitions into eligibility.
 - PostgreSQL audit models, Docker Compose, optional Qdrant, Prometheus/Grafana, backup/restore and CI.
 - Live trading lock and physically separate demo/live credential names.
 

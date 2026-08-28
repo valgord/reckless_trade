@@ -14,7 +14,13 @@ import httpx
 
 from apps.trader.demo_strategy import write_runtime_status
 from intelligence.providers.carry_advisor import OllamaCarryAdvisor
+from intelligence.providers.telegram import (
+    TelegramBotClient,
+    format_carry_alert_message,
+    format_scanner_candidates_message,
+)
 from trading.execution.carry_alerts import CarryAlertConfig, evaluate_carry_alerts
+from trading.execution.carry_scanner_alerts import evaluate_scanner_transition
 
 
 class CarryAlertsWorker:
@@ -30,6 +36,15 @@ class CarryAlertsWorker:
         )
         self.llm_enabled = os.getenv("CARRY_ALERT_LLM_ENABLED", "false").lower() == "true"
         self.webhook_url = os.getenv("CARRY_ALERT_WEBHOOK_URL")
+        self.telegram_enabled = os.getenv("TELEGRAM_ALERTS_ENABLED", "false").lower() == "true"
+        self.telegram_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+        self.telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
+        self.scanner_path = Path(os.getenv("CARRY_SCANNER_STATUS_PATH", "data/runtime/carry-scanner.json"))
+        self.scanner_alert_state_path = Path(
+            os.getenv("CARRY_SCANNER_ALERT_STATE_PATH", "data/runtime/carry-scanner-alert-state.json")
+        )
+        if self.telegram_enabled and (not self.telegram_token or not self.telegram_chat_id):
+            raise ValueError("Telegram alerts require TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID")
 
     async def refresh(self) -> dict[str, Any]:
         observer = _read_optional_json(self.observer_path)
@@ -39,6 +54,7 @@ class CarryAlertsWorker:
         previous = _read_optional_json(self.status_path)
         advisory = await self._advisory(decision.as_dict(), performance, previous, fingerprint)
         changed = previous is None or previous.get("fingerprint") != fingerprint
+        scanner_alerts = await self._scanner_alerts()
         payload = {
             "status": decision.state,
             "mode": "demo",
@@ -49,11 +65,15 @@ class CarryAlertsWorker:
             "fingerprint": fingerprint,
             "llm_advisory": advisory,
             "webhook_configured": bool(self.webhook_url),
+            "telegram_configured": self.telegram_enabled,
+            "scanner_alerts": scanner_alerts,
             "updated_at": datetime.now(tz=UTC).isoformat(),
         }
         write_runtime_status(self.status_path, payload)
         if changed and self.webhook_url:
             await self._notify(payload)
+        if changed and self.telegram_enabled:
+            await self._notify_telegram(payload)
         return payload
 
     async def _advisory(
@@ -67,7 +87,7 @@ class CarryAlertsWorker:
             return {"status": "disabled"}
         if previous and previous.get("fingerprint") == fingerprint:
             cached = previous.get("llm_advisory")
-            if isinstance(cached, dict):
+            if isinstance(cached, dict) and cached.get("prompt_version") == OllamaCarryAdvisor.PROMPT_VERSION:
                 return cached
         advisor = OllamaCarryAdvisor(
             os.getenv("OLLAMA_BASE_URL", "http://ollama:11434"),
@@ -92,6 +112,38 @@ class CarryAlertsWorker:
                 response.raise_for_status()
         except Exception:
             return
+
+    async def _notify_telegram(self, payload: dict[str, Any]) -> None:
+        try:
+            client = TelegramBotClient(self.telegram_token)
+            await client.send_message(self.telegram_chat_id, format_carry_alert_message(payload))
+        except Exception:
+            return
+
+    async def _scanner_alerts(self) -> dict[str, Any]:
+        scanner = _read_optional_json(self.scanner_path)
+        previous_state = _read_optional_json(self.scanner_alert_state_path)
+        event, next_state = evaluate_scanner_transition(scanner, previous_state)
+        if next_state is None:
+            return event
+        candidates = event.get("newly_eligible") or []
+        if candidates and self.telegram_enabled:
+            try:
+                client = TelegramBotClient(self.telegram_token)
+                horizon = int((scanner or {}).get("config", {}).get("horizon_settlements", 0))
+                message = format_scanner_candidates_message(candidates, horizon)
+                await client.send_message(self.telegram_chat_id, message)
+            except Exception as exc:
+                return {
+                    "status": "delivery_failed",
+                    "newly_eligible": [str(candidate.get("symbol")) for candidate in candidates],
+                    "error_type": type(exc).__name__,
+                }
+        write_runtime_status(self.scanner_alert_state_path, next_state)
+        return {
+            **event,
+            "newly_eligible": [str(candidate.get("symbol")) for candidate in candidates],
+        }
 
 
 def _read_optional_json(path: Path) -> dict[str, Any] | None:

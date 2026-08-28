@@ -2,7 +2,7 @@ SHELL := /bin/bash
 PYTHON ?= python3
 M75_START ?= 2022-02-05T07:00:00+00:00
 
-.PHONY: doctor home-doctor home-config home-up home-validate home-history home-news-once home-m7 home-carry install test lint compile research-smoke history history-m5 carry-data m75-data m75 nautilus-backtest m2 m3 m4 m5 m6 m7 news-once up down logs demo-public demo demo-order-smoke demo-observe demo-carry-observe demo-carry-report demo-carry-alerts demo-carry-open demo-carry-close demo-pause live intelligence observability health status backup init-db restore
+.PHONY: doctor home-doctor home-config home-up home-validate home-history home-news-once home-m7 home-carry home-carry-scan home-carry-scanner-start home-carry-recover home-telegram-setup home-telegram-test home-carry-alerts-restart install test lint compile research-smoke history history-m5 carry-data m75-data m75 nautilus-backtest m2 m3 m4 m5 m6 m7 news-once up down logs demo-public demo demo-order-smoke demo-observe demo-carry-observe demo-carry-report demo-carry-scan demo-carry-alerts demo-carry-recover demo-carry-open demo-carry-close demo-pause live intelligence observability health status backup init-db restore
 
 doctor:
 	@echo "== Host =="; uname -a
@@ -36,6 +36,24 @@ home-m7:
 
 home-carry:
 	./scripts/home_stack.sh carry
+
+home-carry-scan:
+	./scripts/home_stack.sh carry-scan
+
+home-carry-scanner-start:
+	./scripts/home_stack.sh carry-scanner-start
+
+home-carry-recover:
+	./scripts/home_stack.sh recover
+
+home-telegram-setup:
+	./scripts/home_stack.sh telegram-setup
+
+home-telegram-test:
+	./scripts/home_stack.sh telegram-test
+
+home-carry-alerts-restart:
+	./scripts/home_stack.sh carry-alerts-restart
 
 install:
 	$(PYTHON) -m pip install -e '.[dev,research,intelligence]'
@@ -126,8 +144,14 @@ demo-carry-observe:
 demo-carry-report:
 	docker compose --profile carry run --rm --build carry-monitor python -m apps.trader.carry_monitor
 
+demo-carry-scan:
+	docker compose --profile carry run --rm --build --no-deps carry-scanner python -m apps.trader.carry_scanner
+
 demo-carry-alerts:
 	docker compose --profile carry run --rm --build carry-alerts python -m apps.trader.carry_alerts
+
+demo-carry-recover:
+	docker compose --profile carry run --rm --build carry-monitor python -m scripts.carry_recover
 
 demo-carry-open:
 	@test "$(CONFIRM)" = "I_UNDERSTAND_THIS_PLACES_DEMO_CARRY_ORDERS" || (echo "Refusing: pass CONFIRM=I_UNDERSTAND_THIS_PLACES_DEMO_CARRY_ORDERS" && exit 1)

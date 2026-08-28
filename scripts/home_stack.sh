@@ -12,12 +12,50 @@ value_for() {
     awk -F= -v key="$1" '$1 == key {sub(/^[^=]*=/, ""); print; exit}' "$ENV_FILE"
 }
 
+load_home_environment() {
+    local key value
+    local keys=(
+        TRADING_MODE ALLOW_LIVE_TRADING RUN_NAUTILUS_NODE ENABLE_DEMO_STRATEGY ENABLE_CARRY_OBSERVER
+        NEWS_FORWARD_TO_INTELLIGENCE INTELLIGENCE_ENABLED
+        CARRY_ALERT_LLM_ENABLED CARRY_ALERT_STALE_SECONDS CARRY_ALERT_PROFIT_REVIEW_USDT
+        CARRY_ALERT_MAXIMUM_LOSS_USDT CARRY_ALERT_MIN_FUNDING_SETTLEMENTS CARRY_ALERT_WEBHOOK_URL
+        TELEGRAM_ALERTS_ENABLED TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID
+        CARRY_SCANNER_REST_URL CARRY_SCANNER_SYMBOLS CARRY_SCANNER_MAX_SYMBOLS
+        CARRY_SCANNER_FUNDING_HISTORY_LIMIT CARRY_SCANNER_TARGET_NOTIONAL_USDT
+        CARRY_SCANNER_HORIZON_SETTLEMENTS CARRY_SCANNER_MIN_TURNOVER_24H_USDT
+        CARRY_SCANNER_MIN_FUNDING_SAMPLES CARRY_SCANNER_MIN_POSITIVE_SHARE
+        CARRY_SCANNER_HISTORY_DB CARRY_SCANNER_HISTORY_RETENTION_DAYS CARRY_SCANNER_ALERT_STATE_PATH
+        POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL
+        QDRANT_URL QDRANT_COLLECTION
+        OLLAMA_DEPLOYMENT OLLAMA_IMAGE OLLAMA_VOLUME_NAME OLLAMA_BASE_URL OLLAMA_EXTERNAL_URL
+        OLLAMA_HOST_CHECK_URL OLLAMA_EXTERNAL_DOCKER_NETWORK OLLAMA_MODEL HOME_DOCKER_SUBNET
+    )
+    for key in "${keys[@]}"; do
+        value=$(value_for "$key")
+        if [[ -n $value ]]; then
+            export "$key=$value"
+        else
+            unset "$key"
+        fi
+    done
+}
+
+load_home_environment
 deployment=$(value_for OLLAMA_DEPLOYMENT)
 deployment=${deployment:-managed}
-compose=(docker compose --env-file "$ENV_FILE" -f docker-compose.yml -f docker-compose.home.yml)
+compose=(
+    docker compose --env-file "$ENV_FILE"
+    -f docker-compose.yml
+    -f docker-compose.home.yml
+    -f docker-compose.home-network.yml
+)
 services=(postgres qdrant intelligence news-worker trader control-api)
 if [[ $deployment == "external" ]]; then
     compose+=(-f docker-compose.home-external-ollama.yml)
+    external_network=$(value_for OLLAMA_EXTERNAL_DOCKER_NETWORK)
+    if [[ -n $external_network ]]; then
+        compose+=(-f docker-compose.home-external-ollama-network.yml)
+    fi
 elif [[ $deployment == "managed" ]]; then
     services=(postgres ollama qdrant intelligence news-worker trader control-api)
 else
@@ -50,6 +88,9 @@ case "${1:-}" in
             curl -fsS --max-time 10 "$host_check_url/api/tags" | grep -Fq 'qwen3:14b'
         fi
         echo "PASS  qwen3:14b is available"
+        "${compose[@]}" --profile intelligence run --rm --no-deps intelligence \
+            python -m scripts.carry_advisor_smoke
+        echo "PASS  qwen3:14b returned the carry advisory schema"
         curl -fsS --max-time 10 http://localhost:8000/runtime/demo-strategy | grep -Fq '"orders_enabled":false'
         curl -fsS --max-time 10 http://localhost:8000/runtime/carry | grep -Fq '"orders_enabled":false'
         echo "PASS  Strategy and carry order submission are disabled"
@@ -60,13 +101,38 @@ case "${1:-}" in
         "${compose[@]}" --profile intelligence run --rm trader python -m scripts.m7_research
         ;;
     carry)
-        carry_services=(postgres qdrant intelligence trader control-api carry-monitor carry-alerts)
+        scripts/home_doctor.sh
+        carry_services=(postgres qdrant intelligence trader control-api carry-monitor carry-scanner carry-alerts)
         if [[ $deployment == "managed" ]]; then
-            carry_services=(postgres ollama qdrant intelligence trader control-api carry-monitor carry-alerts)
+            carry_services=(postgres ollama qdrant intelligence trader control-api carry-monitor carry-scanner carry-alerts)
         fi
         RUN_NAUTILUS_NODE=true ENABLE_DEMO_STRATEGY=false ENABLE_CARRY_OBSERVER=true \
             "${compose[@]}" --profile intelligence --profile carry up -d --build --force-recreate \
             "${carry_services[@]}"
+        ;;
+    recover)
+        "${compose[@]}" --profile carry run --rm --build carry-monitor \
+            python -m scripts.carry_recover
+        ;;
+    carry-scan)
+        "${compose[@]}" --profile carry run --rm --build --no-deps carry-scanner \
+            python -m apps.trader.carry_scanner
+        ;;
+    carry-scanner-start)
+        "${compose[@]}" --profile carry up -d --build --no-deps --force-recreate \
+            carry-scanner control-api
+        ;;
+    telegram-setup)
+        "${compose[@]}" --profile carry run --rm --build --no-deps carry-alerts \
+            python -m scripts.telegram_setup discover
+        ;;
+    telegram-test)
+        "${compose[@]}" --profile carry run --rm --build --no-deps carry-alerts \
+            python -m scripts.telegram_setup test
+        ;;
+    carry-alerts-restart)
+        "${compose[@]}" --profile intelligence --profile carry up -d --no-deps \
+            --build --force-recreate carry-alerts
         ;;
     history)
         "${compose[@]}" --profile intelligence run --rm trader \
@@ -81,7 +147,7 @@ case "${1:-}" in
             news-worker python -m scripts.news_ingest_once
         ;;
     *)
-        echo "Usage: $0 up|validate|history|news-once|m7|carry"
+        echo "Usage: $0 up|validate|history|news-once|m7|carry|carry-scan|carry-scanner-start|recover|telegram-setup|telegram-test|carry-alerts-restart"
         exit 2
         ;;
 esac

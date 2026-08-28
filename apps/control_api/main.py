@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -11,6 +12,7 @@ from starlette.responses import Response
 
 from intelligence.news.ingestion import DurableNewsState
 from platform_core.settings import load_settings
+from storage.carry_scanner_history import read_carry_scan_history
 from storage.database import engine
 
 app = FastAPI(title="Trading Platform Control API", version="0.2.0")
@@ -93,6 +95,7 @@ def carry_runtime_status() -> dict:
     pair_status_path = Path(os.getenv("CARRY_PAIR_STATUS_PATH", "/app/data/runtime/carry-pair.json"))
     performance_path = Path(os.getenv("CARRY_PERFORMANCE_PATH", "/app/data/runtime/carry-performance.json"))
     alerts_path = Path(os.getenv("CARRY_ALERT_STATUS_PATH", "/app/data/runtime/carry-alerts.json"))
+    scanner_path = Path(os.getenv("CARRY_SCANNER_STATUS_PATH", "/app/data/runtime/carry-scanner.json"))
     result = {
         "observer_enabled": os.getenv("ENABLE_CARRY_OBSERVER", "false").lower() == "true",
         "orders_enabled": False,
@@ -101,6 +104,7 @@ def carry_runtime_status() -> dict:
         "last_pair": None,
         "performance": None,
         "alerts": None,
+        "scanner": None,
     }
     if status_path.exists():
         try:
@@ -122,7 +126,37 @@ def carry_runtime_status() -> dict:
             result["alerts"] = json.loads(alerts_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             result["alerts_status_error"] = type(exc).__name__
+    if scanner_path.exists():
+        try:
+            result["scanner"] = json.loads(scanner_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            result["scanner_status_error"] = type(exc).__name__
     return result
+
+
+@app.get("/runtime/carry-scanner")
+def carry_scanner_runtime_status() -> dict:
+    path = Path(os.getenv("CARRY_SCANNER_STATUS_PATH", "/app/data/runtime/carry-scanner.json"))
+    if not path.exists():
+        return {"status": "not_run", "orders_enabled": False, "automatic_actions_enabled": False}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return {
+            "status": "invalid",
+            "orders_enabled": False,
+            "automatic_actions_enabled": False,
+            "status_error": type(exc).__name__,
+        }
+
+
+@app.get("/runtime/carry-scanner/history")
+def carry_scanner_history(symbol: str | None = None, limit: int = 100) -> dict:
+    path = Path(os.getenv("CARRY_SCANNER_HISTORY_DB", "/app/data/carry/scanner-history.sqlite3"))
+    try:
+        return read_carry_scan_history(path, symbol=symbol, limit=limit)
+    except (OSError, ValueError, sqlite3.Error) as exc:
+        return {"status": "invalid", "symbol": symbol, "observations": [], "status_error": type(exc).__name__}
 
 
 @app.get("/research/backtest")

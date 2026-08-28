@@ -24,6 +24,12 @@ NEWS_FORWARD_TO_INTELLIGENCE=false
 OLLAMA_MODEL=qwen3:14b
 ```
 
+`HOME_DOCKER_SUBNET` defaults to `172.30.0.0/24` so the home stack does not depend on Docker's automatic address-pool
+availability. Change it before first start if that subnet overlaps the host LAN, VPN or another Docker network.
+
+The home scripts load deployment and safety values from `ENV_FILE` before invoking Compose. Exported shell variables
+with the same names therefore cannot silently override the file that `home-doctor` inspected.
+
 `.env`, Docker volumes, PostgreSQL contents and `data/` are not stored in Git.
 
 ## 2. Choose the Ollama owner
@@ -50,6 +56,18 @@ OLLAMA_HOST_CHECK_URL=http://localhost:11434
 
 The external container must listen beyond its own loopback interface and publish port `11434` to the host. The project
 does not start or modify that container.
+
+If Ollama intentionally publishes only on host loopback, attach the two model-client services to its existing Docker
+network instead. Use the Ollama service/container DNS name in the URL:
+
+```dotenv
+OLLAMA_EXTERNAL_URL=http://existing-ollama:11434
+OLLAMA_EXTERNAL_DOCKER_NETWORK=existing-ollama-network
+```
+
+The network must already exist. The project joins it but does not create, restart or modify the external Ollama
+container. `home-doctor` checks the network, and `home-validate` performs a structured carry-advisor inference through
+the same container route used at runtime.
 
 ## 3. Inspect before starting
 
@@ -151,6 +169,12 @@ curl -fsS http://localhost:8000/runtime/carry
 The report separates basis PnL, actual funding and fees. Treat `estimated_net_pnl_usdt` as mark-to-market only until a
 confirmed paired close establishes the realized result.
 
+If an executor-created Demo pair is still open but the local `data/runtime/carry-pair.json` and ownership journal were
+lost, first run the observer and then use `make demo-carry-recover`. Recovery is local-only: it searches read-only
+Bybit execution history for exactly one matching `rt-carry-open-*` Spot/Linear pair, verifies the reconciled short,
+BTC coverage and absence of open orders, and refuses to overwrite existing journals. It never submits an order.
+Use `make home-carry-recover` while the home Compose stack is running so recovery reuses the same network overlays.
+
 ## 9. Start alerts with the local 14B model
 
 After `make home-validate` confirms `qwen3:14b`, start the carry observer, performance monitor and alert worker through
@@ -164,3 +188,50 @@ curl -fsS http://localhost:8000/runtime/carry
 The model only explains deterministic alerts. It has no exchange credentials, order API or authority to approve a
 repair/close. Set `CARRY_ALERT_WEBHOOK_URL` only for an endpoint you control; sanitized state is sent once when the alert
 fingerprint changes. With no webhook, alerts remain available through the runtime API and JSON status file.
+
+For Telegram delivery, create a bot, send it `/start`, and put only its token in `TELEGRAM_BOT_TOKEN`. Keep delivery
+disabled while discovering and testing the destination:
+
+```bash
+make home-telegram-setup
+# Copy the returned numeric chat_id into TELEGRAM_CHAT_ID in .env.
+make home-telegram-test
+```
+
+After the test message arrives, set `TELEGRAM_ALERTS_ENABLED=true` and restart `carry-alerts`. Telegram receives a
+message only when the deterministic alert fingerprint changes. The notifier sends messages but does not poll or
+implement Telegram commands.
+
+```bash
+make home-carry-alerts-restart
+```
+
+The 14B response is accepted only if its echoed monitor state, position phase and alert codes exactly match the
+deterministic payload. A mismatch hides all generated prose and Telegram shows a safe rejection notice instead.
+
+## 10. Scan multiple carry candidates without orders
+
+Run a one-shot public market scan:
+
+```bash
+make home-carry-scan
+curl -fsS http://localhost:8000/runtime/carry-scanner
+```
+
+After validating the first snapshot, start continuous five-minute refreshes with `make home-carry-scanner-start`.
+This target recreates only `carry-scanner` and `control-api`; it does not restart the trader or open-pair monitor.
+
+The scanner receives no Bybit credentials. By default it examines up to 20 of the most liquid common USDT Spot and
+Linear Perpetual symbols and records recent funding stability, top-of-book capacity, minimum pair notional, explicit
+round-trip taker fees and the estimated net result over three settlements. It cannot open or recommend a pair for
+execution; multi-pair Demo trading requires a later ownership and portfolio-risk gate.
+
+Each five-minute snapshot is compacted into a local SQLite history with 90-day retention:
+
+```bash
+curl -fsS 'http://localhost:8000/runtime/carry-scanner/history?symbol=BTCUSDT&limit=100'
+```
+
+The first alert-worker observation is a silent baseline. If a later snapshot changes a symbol from ineligible to
+eligible, Telegram sends one review-only notification. The persistent transition state prevents duplicate messages
+after restarts; it does not approve or submit a pair.

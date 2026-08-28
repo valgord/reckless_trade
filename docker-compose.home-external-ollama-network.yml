@@ -1,0 +1,15 @@
+services:
+  carry-alerts:
+    networks:
+      - default
+      - ollama-external
+
+  intelligence:
+    networks:
+      - default
+      - ollama-external
+
+networks:
+  ollama-external:
+    external: true
+    name: ${OLLAMA_EXTERNAL_DOCKER_NETWORK}

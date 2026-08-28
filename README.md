@@ -256,8 +256,9 @@ alert fingerprint changes. Every trade-related recommendation has `confirmation_
 execution client and reports `automatic_actions_enabled=false`.
 
 An optional local Ollama advisor explains the unchanged deterministic decision in Russian. The model receives no
-exchange credentials or execution tool and cannot authorize an action. Enable it only after the configured model is
-reachable:
+exchange credentials or execution tool and cannot authorize an action. The `carry-alerts` and `intelligence` services
+use explicit environment allowlists instead of inheriting the trading `.env`. Enable the advisor only after the
+configured model is reachable:
 
 ```dotenv
 CARRY_ALERT_LLM_ENABLED=true
@@ -267,6 +268,39 @@ OLLAMA_MODEL=qwen3:14b
 Run `make demo-carry-alerts` for one snapshot, `make demo-carry-observe` for continuous monitoring, or `make home-carry`
 when using the managed/external Ollama selection from the home deployment files. Alerts are included in
 `GET /runtime/carry` and persisted at `data/runtime/carry-alerts.json`.
+`make home-validate` also performs one schema-validated advisor inference, so model visibility alone is not treated as
+proof that the runtime container can reach it.
+
+For push delivery, the optional Telegram notifier sends only change-deduplicated alert text and the 14B explanation.
+It does not accept trading commands. After sending `/start` to a new bot, use `make home-telegram-setup` to discover
+the private chat ID and `make home-telegram-test` to verify delivery before setting `TELEGRAM_ALERTS_ENABLED=true`.
+Restart only the notifier with `make home-carry-alerts-restart`. Before generated prose can reach Telegram, the model
+must echo the deterministic monitor state, position phase and alert codes exactly; otherwise its entire response is
+rejected and replaced with a safe notice.
+
+## M7.10 multi-pair carry scanner
+
+`carry-scanner` uses public Bybit market data only and has no API credentials or order client. It intersects active
+USDT Spot and Linear Perpetual instruments, preselects a bounded liquid universe, then ranks candidates using current
+funding, recent funding history, first-level executable prices and capacity, minimum order notional, explicit taker
+fees and a configurable settlement horizon. The estimate is a snapshot, not a forecast or an execution signal.
+
+```bash
+make home-carry-scan
+curl -fsS http://localhost:8000/runtime/carry-scanner
+```
+
+Use `make home-carry-scanner-start` to run the five-minute scanner continuously and refresh the Control API without
+restarting the active trader or single-pair carry monitor.
+
+An empty `CARRY_SCANNER_SYMBOLS` enables liquidity-based discovery. Set a comma-separated allowlist to constrain the
+universe. `orders_enabled=false` and `automatic_actions_enabled=false` are persisted in every successful or failed
+scanner status.
+
+Compact candidate observations are retained for 90 days in a local SQLite database and exposed through
+`GET /runtime/carry-scanner/history?symbol=BTCUSDT&limit=100`. The alert worker records the first scanner snapshot as a
+silent baseline. On a later `eligible=false` to `eligible=true` transition, it sends one deterministic Telegram review
+notice; repeated reads of the same snapshot are deduplicated and never place an order.
 
 ## Safety
 

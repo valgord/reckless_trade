@@ -1,0 +1,5 @@
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${HOME_DOCKER_SUBNET:-172.30.0.0/24}

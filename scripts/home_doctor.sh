@@ -24,12 +24,47 @@ if [[ ! -f "$ENV_FILE" ]]; then
     exit 1
 fi
 
+load_home_environment() {
+    local key value
+    local keys=(
+        TRADING_MODE ALLOW_LIVE_TRADING RUN_NAUTILUS_NODE ENABLE_DEMO_STRATEGY ENABLE_CARRY_OBSERVER
+        NEWS_FORWARD_TO_INTELLIGENCE INTELLIGENCE_ENABLED
+        CARRY_ALERT_LLM_ENABLED CARRY_ALERT_STALE_SECONDS CARRY_ALERT_PROFIT_REVIEW_USDT
+        CARRY_ALERT_MAXIMUM_LOSS_USDT CARRY_ALERT_MIN_FUNDING_SETTLEMENTS CARRY_ALERT_WEBHOOK_URL
+        TELEGRAM_ALERTS_ENABLED TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID
+        CARRY_SCANNER_REST_URL CARRY_SCANNER_SYMBOLS CARRY_SCANNER_MAX_SYMBOLS
+        CARRY_SCANNER_FUNDING_HISTORY_LIMIT CARRY_SCANNER_TARGET_NOTIONAL_USDT
+        CARRY_SCANNER_HORIZON_SETTLEMENTS CARRY_SCANNER_MIN_TURNOVER_24H_USDT
+        CARRY_SCANNER_MIN_FUNDING_SAMPLES CARRY_SCANNER_MIN_POSITIVE_SHARE
+        CARRY_SCANNER_HISTORY_DB CARRY_SCANNER_HISTORY_RETENTION_DAYS CARRY_SCANNER_ALERT_STATE_PATH
+        POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL
+        QDRANT_URL QDRANT_COLLECTION
+        OLLAMA_DEPLOYMENT OLLAMA_IMAGE OLLAMA_VOLUME_NAME OLLAMA_BASE_URL OLLAMA_EXTERNAL_URL
+        OLLAMA_HOST_CHECK_URL OLLAMA_EXTERNAL_DOCKER_NETWORK OLLAMA_MODEL HOME_DOCKER_SUBNET
+    )
+    for key in "${keys[@]}"; do
+        value=$(value_for "$key")
+        if [[ -n $value ]]; then
+            export "$key=$value"
+        else
+            unset "$key"
+        fi
+    done
+}
+
+load_home_environment
 deployment=$(value_for OLLAMA_DEPLOYMENT)
 deployment=${deployment:-managed}
-compose=(docker compose --env-file "$ENV_FILE" -f docker-compose.yml)
+compose=(docker compose --env-file "$ENV_FILE" -f docker-compose.yml -f docker-compose.home-network.yml)
 case "$deployment" in
     managed) compose+=(-f docker-compose.home.yml) ;;
-    external) compose+=(-f docker-compose.home.yml -f docker-compose.home-external-ollama.yml) ;;
+    external)
+        compose+=(-f docker-compose.home.yml -f docker-compose.home-external-ollama.yml)
+        external_network=$(value_for OLLAMA_EXTERNAL_DOCKER_NETWORK)
+        if [[ -n $external_network ]]; then
+            compose+=(-f docker-compose.home-external-ollama-network.yml)
+        fi
+        ;;
     *) fail "OLLAMA_DEPLOYMENT must be managed or external" ;;
 esac
 
@@ -71,6 +106,11 @@ if [[ $deployment == "managed" ]]; then
     [[ -d /dev/dri ]] && pass "/dev/dri is available" || fail "/dev/dri is unavailable"
 else
     pass "GPU device checks belong to the external Ollama container"
+    if [[ -n ${external_network:-} ]]; then
+        docker network inspect "$external_network" >/dev/null 2>&1 \
+            && pass "External Ollama Docker network is available" \
+            || fail "External Ollama Docker network is unavailable: $external_network"
+    fi
 fi
 
 postgres_password=$(value_for POSTGRES_PASSWORD)

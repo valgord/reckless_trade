@@ -72,16 +72,47 @@ services:
       - ./data:/app/data
     restart: unless-stopped
 
+  carry-scanner:
+    profiles: ["carry"]
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
+    command: ["python", "-m", "apps.trader.carry_scanner", "--watch", "--poll-seconds", "300"]
+    environment:
+      CARRY_SCANNER_REST_URL: ${CARRY_SCANNER_REST_URL:-https://api.bybit.com}
+      CARRY_SCANNER_SYMBOLS: ${CARRY_SCANNER_SYMBOLS:-}
+      CARRY_SCANNER_MAX_SYMBOLS: ${CARRY_SCANNER_MAX_SYMBOLS:-20}
+      CARRY_SCANNER_FUNDING_HISTORY_LIMIT: ${CARRY_SCANNER_FUNDING_HISTORY_LIMIT:-21}
+      CARRY_SCANNER_TARGET_NOTIONAL_USDT: ${CARRY_SCANNER_TARGET_NOTIONAL_USDT:-100}
+      CARRY_SCANNER_HORIZON_SETTLEMENTS: ${CARRY_SCANNER_HORIZON_SETTLEMENTS:-3}
+      CARRY_SCANNER_MIN_TURNOVER_24H_USDT: ${CARRY_SCANNER_MIN_TURNOVER_24H_USDT:-10000000}
+      CARRY_SCANNER_MIN_FUNDING_SAMPLES: ${CARRY_SCANNER_MIN_FUNDING_SAMPLES:-6}
+      CARRY_SCANNER_MIN_POSITIVE_SHARE: ${CARRY_SCANNER_MIN_POSITIVE_SHARE:-0.6}
+      CARRY_SCANNER_HISTORY_DB: ${CARRY_SCANNER_HISTORY_DB:-/app/data/carry/scanner-history.sqlite3}
+      CARRY_SCANNER_HISTORY_RETENTION_DAYS: ${CARRY_SCANNER_HISTORY_RETENTION_DAYS:-90}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
   carry-alerts:
     profiles: ["carry"]
     build:
       context: .
       dockerfile: infra/docker/Dockerfile
-    env_file: .env
     command: ["python", "-m", "apps.trader.carry_alerts", "--watch", "--poll-seconds", "30"]
     environment:
       TRADING_MODE: demo
       CARRY_ALERT_LLM_ENABLED: ${CARRY_ALERT_LLM_ENABLED:-false}
+      CARRY_ALERT_STALE_SECONDS: ${CARRY_ALERT_STALE_SECONDS:-180}
+      CARRY_ALERT_PROFIT_REVIEW_USDT: ${CARRY_ALERT_PROFIT_REVIEW_USDT:-0.05}
+      CARRY_ALERT_MAXIMUM_LOSS_USDT: ${CARRY_ALERT_MAXIMUM_LOSS_USDT:--2}
+      CARRY_ALERT_MIN_FUNDING_SETTLEMENTS: ${CARRY_ALERT_MIN_FUNDING_SETTLEMENTS:-3}
+      CARRY_ALERT_WEBHOOK_URL: ${CARRY_ALERT_WEBHOOK_URL:-}
+      TELEGRAM_ALERTS_ENABLED: ${TELEGRAM_ALERTS_ENABLED:-false}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      CARRY_SCANNER_STATUS_PATH: ${CARRY_SCANNER_STATUS_PATH:-/app/data/runtime/carry-scanner.json}
+      CARRY_SCANNER_ALERT_STATE_PATH: ${CARRY_SCANNER_ALERT_STATE_PATH:-/app/data/runtime/carry-scanner-alert-state.json}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:14b}
     extra_hosts:
@@ -95,11 +126,14 @@ services:
     build:
       context: .
       dockerfile: infra/docker/Dockerfile
-    env_file: .env
     command: ["uvicorn", "apps.intelligence.main:app", "--host", "0.0.0.0", "--port", "8010"]
     environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://trading:change-me@postgres:5432/trading}
       INTELLIGENCE_ENABLED: ${INTELLIGENCE_ENABLED:-false}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:0.6b}
+      QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
+      QDRANT_COLLECTION: ${QDRANT_COLLECTION:-market_events}
     ports: ["8010:8010"]
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8010/health"]
