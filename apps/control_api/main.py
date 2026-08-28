@@ -92,6 +92,7 @@ def carry_runtime_status() -> dict:
     status_path = Path(os.getenv("CARRY_STATUS_PATH", "/app/data/runtime/carry-observer.json"))
     pair_status_path = Path(os.getenv("CARRY_PAIR_STATUS_PATH", "/app/data/runtime/carry-pair.json"))
     performance_path = Path(os.getenv("CARRY_PERFORMANCE_PATH", "/app/data/runtime/carry-performance.json"))
+    alerts_path = Path(os.getenv("CARRY_ALERT_STATUS_PATH", "/app/data/runtime/carry-alerts.json"))
     result = {
         "observer_enabled": os.getenv("ENABLE_CARRY_OBSERVER", "false").lower() == "true",
         "orders_enabled": False,
@@ -99,6 +100,7 @@ def carry_runtime_status() -> dict:
         "last_status": None,
         "last_pair": None,
         "performance": None,
+        "alerts": None,
     }
     if status_path.exists():
         try:
@@ -115,6 +117,11 @@ def carry_runtime_status() -> dict:
             result["performance"] = json.loads(performance_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             result["performance_status_error"] = type(exc).__name__
+    if alerts_path.exists():
+        try:
+            result["alerts"] = json.loads(alerts_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            result["alerts_status_error"] = type(exc).__name__
     return result
 
 

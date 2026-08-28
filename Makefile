@@ -2,7 +2,7 @@ SHELL := /bin/bash
 PYTHON ?= python3
 M75_START ?= 2022-02-05T07:00:00+00:00
 
-.PHONY: doctor home-doctor home-config home-up home-validate home-history home-news-once home-m7 install test lint compile research-smoke history history-m5 carry-data m75-data m75 nautilus-backtest m2 m3 m4 m5 m6 m7 news-once up down logs demo-public demo demo-order-smoke demo-observe demo-carry-observe demo-carry-report demo-carry-open demo-carry-close demo-pause live intelligence observability health status backup init-db restore
+.PHONY: doctor home-doctor home-config home-up home-validate home-history home-news-once home-m7 home-carry install test lint compile research-smoke history history-m5 carry-data m75-data m75 nautilus-backtest m2 m3 m4 m5 m6 m7 news-once up down logs demo-public demo demo-order-smoke demo-observe demo-carry-observe demo-carry-report demo-carry-alerts demo-carry-open demo-carry-close demo-pause live intelligence observability health status backup init-db restore
 
 doctor:
 	@echo "== Host =="; uname -a
@@ -33,6 +33,9 @@ home-news-once:
 
 home-m7:
 	LIMIT=$${LIMIT:-5} ./scripts/home_stack.sh m7
+
+home-carry:
+	./scripts/home_stack.sh carry
 
 install:
 	$(PYTHON) -m pip install -e '.[dev,research,intelligence]'
@@ -114,14 +117,17 @@ demo-order-smoke:
 	TRADING_MODE=demo docker compose run --rm -e BYBIT_DEMO_ORDER_SMOKE_CONFIRMATION="$(CONFIRM)" trader python -m apps.trader.bybit_smoke --order-smoke
 
 demo-observe:
-	docker compose --profile carry stop carry-monitor
+	docker compose --profile carry stop carry-monitor carry-alerts
 	TRADING_MODE=demo RUN_NAUTILUS_NODE=true ENABLE_DEMO_STRATEGY=true ENABLE_CARRY_OBSERVER=false docker compose up -d --build --force-recreate trader control-api
 
 demo-carry-observe:
-	TRADING_MODE=demo RUN_NAUTILUS_NODE=true ENABLE_DEMO_STRATEGY=false ENABLE_CARRY_OBSERVER=true docker compose --profile carry up -d --build --force-recreate trader control-api carry-monitor
+	TRADING_MODE=demo RUN_NAUTILUS_NODE=true ENABLE_DEMO_STRATEGY=false ENABLE_CARRY_OBSERVER=true docker compose --profile carry up -d --build --force-recreate trader control-api carry-monitor carry-alerts
 
 demo-carry-report:
 	docker compose --profile carry run --rm --build carry-monitor python -m apps.trader.carry_monitor
+
+demo-carry-alerts:
+	docker compose --profile carry run --rm --build carry-alerts python -m apps.trader.carry_alerts
 
 demo-carry-open:
 	@test "$(CONFIRM)" = "I_UNDERSTAND_THIS_PLACES_DEMO_CARRY_ORDERS" || (echo "Refusing: pass CONFIRM=I_UNDERSTAND_THIS_PLACES_DEMO_CARRY_ORDERS" && exit 1)
@@ -132,7 +138,7 @@ demo-carry-close:
 	docker compose run --rm --build -e BYBIT_DEMO_CARRY_CONFIRMATION="$(CONFIRM)" trader python -m apps.trader.carry_pair close
 
 demo-pause:
-	docker compose --profile carry stop carry-monitor
+	docker compose --profile carry stop carry-monitor carry-alerts
 	TRADING_MODE=demo RUN_NAUTILUS_NODE=false ENABLE_DEMO_STRATEGY=false ENABLE_CARRY_OBSERVER=false docker compose up -d --force-recreate trader control-api
 
 live:

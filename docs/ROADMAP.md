@@ -77,6 +77,11 @@ Persist the actual entry fills, collect private funding settlements and attribut
 funding and fees. Report both pre-exit PnL and executable-price net PnL after estimated closing fees. The monitor is
 read-only; a final realized result still requires a separately confirmed paired close.
 
+## M7.9 - Alerts and manual approval
+Watch observer/performance freshness and deterministic risk states, emit change-deduplicated alerts and optionally use
+the local 14B model to explain them. The LLM cannot alter severity, choose an execution action or access credentials.
+Pair repair/close remains a one-shot operator-confirmed command; continuous autonomous execution stays disabled.
+
 ## M8 - Multi-strategy and regime allocation
 Strategy portfolio, regime-dependent weights, performance attribution per alpha/strategy.
 

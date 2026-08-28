@@ -72,6 +72,24 @@ services:
       - ./data:/app/data
     restart: unless-stopped
 
+  carry-alerts:
+    profiles: ["carry"]
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
+    env_file: .env
+    command: ["python", "-m", "apps.trader.carry_alerts", "--watch", "--poll-seconds", "30"]
+    environment:
+      TRADING_MODE: demo
+      CARRY_ALERT_LLM_ENABLED: ${CARRY_ALERT_LLM_ENABLED:-false}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:14b}
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
   intelligence:
     profiles: ["intelligence"]
     build:

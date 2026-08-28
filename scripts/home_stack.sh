@@ -59,6 +59,15 @@ case "${1:-}" in
             python -m scripts.m7_analyse --limit "${LIMIT:-5}"
         "${compose[@]}" --profile intelligence run --rm trader python -m scripts.m7_research
         ;;
+    carry)
+        carry_services=(postgres qdrant intelligence trader control-api carry-monitor carry-alerts)
+        if [[ $deployment == "managed" ]]; then
+            carry_services=(postgres ollama qdrant intelligence trader control-api carry-monitor carry-alerts)
+        fi
+        RUN_NAUTILUS_NODE=true ENABLE_DEMO_STRATEGY=false ENABLE_CARRY_OBSERVER=true \
+            "${compose[@]}" --profile intelligence --profile carry up -d --build --force-recreate \
+            "${carry_services[@]}"
+        ;;
     history)
         "${compose[@]}" --profile intelligence run --rm trader \
             python -m scripts.bybit_history --days "${DAYS:-365}"
@@ -72,7 +81,7 @@ case "${1:-}" in
             news-worker python -m scripts.news_ingest_once
         ;;
     *)
-        echo "Usage: $0 up|validate|history|news-once|m7"
+        echo "Usage: $0 up|validate|history|news-once|m7|carry"
         exit 2
         ;;
 esac

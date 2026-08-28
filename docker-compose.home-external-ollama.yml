@@ -1,4 +1,12 @@
 services:
+  carry-alerts:
+    environment:
+      CARRY_ALERT_LLM_ENABLED: ${CARRY_ALERT_LLM_ENABLED:-true}
+      OLLAMA_BASE_URL: ${OLLAMA_EXTERNAL_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:14b}
+    extra_hosts:
+      - host.docker.internal:host-gateway
+
   intelligence:
     environment:
       INTELLIGENCE_ENABLED: "true"

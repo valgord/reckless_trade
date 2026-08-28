@@ -248,6 +248,26 @@ The entry is persisted in `data/runtime/carry-cycle.json`, while the latest repo
 `estimated_net_pnl_usdt` also subtracts estimated exit fees and uses executable exit prices. Only a completed paired
 close can establish final realized PnL.
 
+## M7.9 carry alerts and approval
+
+`carry-alerts` evaluates deterministic stale-data, reconciliation, leg mismatch, guard-close, negative-funding,
+loss-limit and profit-review rules every 30 seconds. It can send sanitized JSON to an optional webhook only when the
+alert fingerprint changes. Every trade-related recommendation has `confirmation_required=true`; the worker has no
+execution client and reports `automatic_actions_enabled=false`.
+
+An optional local Ollama advisor explains the unchanged deterministic decision in Russian. The model receives no
+exchange credentials or execution tool and cannot authorize an action. Enable it only after the configured model is
+reachable:
+
+```dotenv
+CARRY_ALERT_LLM_ENABLED=true
+OLLAMA_MODEL=qwen3:14b
+```
+
+Run `make demo-carry-alerts` for one snapshot, `make demo-carry-observe` for continuous monitoring, or `make home-carry`
+when using the managed/external Ollama selection from the home deployment files. Alerts are included in
+`GET /runtime/carry` and persisted at `data/runtime/carry-alerts.json`.
+
 ## Safety
 
 - Never grant withdrawal permission to the bot key.

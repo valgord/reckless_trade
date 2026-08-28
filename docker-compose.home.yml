@@ -1,4 +1,10 @@
 services:
+  carry-alerts:
+    environment:
+      CARRY_ALERT_LLM_ENABLED: ${CARRY_ALERT_LLM_ENABLED:-true}
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:14b}
+
   intelligence:
     environment:
       INTELLIGENCE_ENABLED: "true"
@@ -16,14 +22,16 @@ services:
   trader:
     environment:
       TRADING_MODE: demo
-      RUN_NAUTILUS_NODE: "false"
-      ENABLE_DEMO_STRATEGY: "false"
+      RUN_NAUTILUS_NODE: ${RUN_NAUTILUS_NODE:-false}
+      ENABLE_DEMO_STRATEGY: ${ENABLE_DEMO_STRATEGY:-false}
+      ENABLE_CARRY_OBSERVER: ${ENABLE_CARRY_OBSERVER:-false}
 
   control-api:
     environment:
       TRADING_MODE: demo
-      RUN_NAUTILUS_NODE: "false"
-      ENABLE_DEMO_STRATEGY: "false"
+      RUN_NAUTILUS_NODE: ${RUN_NAUTILUS_NODE:-false}
+      ENABLE_DEMO_STRATEGY: ${ENABLE_DEMO_STRATEGY:-false}
+      ENABLE_CARRY_OBSERVER: ${ENABLE_CARRY_OBSERVER:-false}
       NEWS_FORWARD_TO_INTELLIGENCE: "false"
 
   news-worker:

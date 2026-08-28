@@ -150,3 +150,17 @@ curl -fsS http://localhost:8000/runtime/carry
 
 The report separates basis PnL, actual funding and fees. Treat `estimated_net_pnl_usdt` as mark-to-market only until a
 confirmed paired close establishes the realized result.
+
+## 9. Start alerts with the local 14B model
+
+After `make home-validate` confirms `qwen3:14b`, start the carry observer, performance monitor and alert worker through
+the same managed/external Ollama Compose selection:
+
+```bash
+make home-carry
+curl -fsS http://localhost:8000/runtime/carry
+```
+
+The model only explains deterministic alerts. It has no exchange credentials, order API or authority to approve a
+repair/close. Set `CARRY_ALERT_WEBHOOK_URL` only for an endpoint you control; sanitized state is sent once when the alert
+fingerprint changes. With no webhook, alerts remain available through the runtime API and JSON status file.

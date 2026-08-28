@@ -327,13 +327,19 @@ def test_control_api_reads_backtest_report(monkeypatch, tmp_path):
 def test_control_api_reads_locked_carry_observer_status(monkeypatch, tmp_path):
     path = tmp_path / "carry.json"
     performance_path = tmp_path / "carry-performance.json"
+    alerts_path = tmp_path / "carry-alerts.json"
     path.write_text(json.dumps({"status": "hedged", "orders_enabled": False}), encoding="utf-8")
     performance_path.write_text(
         json.dumps({"status": "monitoring", "performance": {"estimated_net_pnl_usdt": 0.01}}),
         encoding="utf-8",
     )
+    alerts_path.write_text(
+        json.dumps({"status": "monitoring", "automatic_actions_enabled": False}),
+        encoding="utf-8",
+    )
     monkeypatch.setenv("CARRY_STATUS_PATH", str(path))
     monkeypatch.setenv("CARRY_PERFORMANCE_PATH", str(performance_path))
+    monkeypatch.setenv("CARRY_ALERT_STATUS_PATH", str(alerts_path))
     monkeypatch.setenv("ENABLE_CARRY_OBSERVER", "true")
 
     result = carry_runtime_status()
@@ -343,6 +349,7 @@ def test_control_api_reads_locked_carry_observer_status(monkeypatch, tmp_path):
     assert result["execution_gate"] == "one_shot_confirmation_required"
     assert result["last_status"]["status"] == "hedged"
     assert result["performance"]["performance"]["estimated_net_pnl_usdt"] == 0.01
+    assert result["alerts"]["automatic_actions_enabled"] is False
 
 
 def test_control_api_reads_m3_research_report(monkeypatch, tmp_path):
