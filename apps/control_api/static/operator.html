@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Reckless Trade | Журнал решений</title>
+  <link rel="stylesheet" href="/operator-assets/operator.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+        <div>
+          <strong>Reckless Trade</strong>
+          <span>Журнал решений</span>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <span class="mode-badge">DEMO</span>
+        <span class="safety-badge" id="safety-badge">Автодействия выключены</span>
+        <button id="refresh-button" type="button">Обновить</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="decision-band" aria-labelledby="current-decision-title">
+      <div class="decision-copy">
+        <div class="section-kicker">Текущее состояние</div>
+        <div class="decision-heading">
+          <span class="decision-indicator" id="decision-indicator" aria-hidden="true"></span>
+          <h1 id="current-decision-title">Загрузка...</h1>
+        </div>
+        <p id="current-decision-summary">Получаем состояние стратегии и проверок риска.</p>
+      </div>
+      <div class="decision-meta">
+        <div><span>Позиция</span><strong id="position-phase">...</strong></div>
+        <div><span>Последнее обновление</span><strong id="last-updated">...</strong></div>
+      </div>
+    </section>
+
+    <section class="metric-strip" aria-label="Ключевые показатели">
+      <div class="metric"><span>Оценка результата</span><strong id="net-pnl">...</strong><small>с учётом выхода</small></div>
+      <div class="metric"><span>Получено funding</span><strong id="funding-income">...</strong><small id="funding-count">...</small></div>
+      <div class="metric"><span>Дельта позиции</span><strong id="position-delta">...</strong><small>BTC Spot + Perpetual</small></div>
+      <div class="metric"><span>Carry-кандидаты</span><strong id="eligible-count">...</strong><small id="scan-count">...</small></div>
+    </section>
+
+    <section class="chart-section" aria-labelledby="chart-title">
+      <div class="section-header">
+        <div>
+          <div class="section-kicker">BTCUSDT</div>
+          <h2 id="chart-title">Оценка carry после издержек</h2>
+        </div>
+        <div class="chart-range" id="chart-range">Последние наблюдения</div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="carry-chart" aria-label="График оценки результата carry" role="img"></canvas>
+        <div class="chart-empty" id="chart-empty">Недостаточно наблюдений</div>
+      </div>
+    </section>
+
+    <div class="workspace-grid">
+      <section class="workspace-section" aria-labelledby="decisions-title">
+        <div class="section-header">
+          <div>
+            <div class="section-kicker">Audit trail</div>
+            <h2 id="decisions-title">Принятые решения</h2>
+          </div>
+          <span class="count-label" id="decision-count">0</span>
+        </div>
+        <div class="feed" id="decision-feed">
+          <div class="empty-state">Загрузка журнала...</div>
+        </div>
+      </section>
+
+      <section class="workspace-section news-section" aria-labelledby="news-title">
+        <div class="section-header">
+          <div>
+            <div class="section-kicker">Новостной контекст</div>
+            <h2 id="news-title">Последний анализ</h2>
+          </div>
+          <span class="count-label" id="news-count">0</span>
+        </div>
+        <div class="feed" id="news-feed">
+          <div class="empty-state">Загрузка новостей...</div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    <span id="connection-status">Подключение...</span>
+    <span id="refresh-time"></span>
+  </footer>
+  <script src="/operator-assets/operator.js" defer></script>
+</body>
+</html>

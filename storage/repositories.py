@@ -8,6 +8,7 @@ from domain.models import IntelligenceEvent
 from intelligence.news.dedup import fingerprint
 from storage.database import SessionLocal
 from storage.models import Experiment, LlmAnalysis, NewsArticle, StrategyDecision
+from trading.decision_audit import AlgorithmDecisionAudit
 
 
 class AuditRepository:
@@ -155,6 +156,57 @@ class AuditRepository:
             "timing_violations": timing_violations,
         }
 
+    async def get_recent_news_with_analysis(self, limit: int = 30) -> list[dict]:
+        if limit < 1 or limit > 100:
+            raise ValueError("news audit limit must be between 1 and 100")
+        statement = (
+            select(NewsArticle, LlmAnalysis)
+            .outerjoin(LlmAnalysis, LlmAnalysis.article_id == NewsArticle.id)
+            .order_by(NewsArticle.first_seen_at.desc(), LlmAnalysis.completed_at.desc().nulls_last())
+            .limit(limit * 3)
+        )
+        async with SessionLocal() as session:
+            rows = (await session.execute(statement)).all()
+        result = []
+        seen: set[str] = set()
+        for article, analysis in rows:
+            if article.id in seen:
+                continue
+            seen.add(article.id)
+            response = analysis.response if analysis is not None else {}
+            result.append(
+                {
+                    "article_id": article.id,
+                    "fingerprint": article.fingerprint,
+                    "source": article.source,
+                    "title": article.title,
+                    "body": article.body,
+                    "article_url": (article.raw_metadata or {}).get("url", ""),
+                    "image_url": (article.raw_metadata or {}).get("image_url"),
+                    "published_at": article.published_at.isoformat(),
+                    "first_seen_at": article.first_seen_at.isoformat(),
+                    "analysis": (
+                        {
+                            "event_id": analysis.id,
+                            "model": analysis.model,
+                            "completed_at": analysis.completed_at.isoformat(),
+                            "summary": str((response or {}).get("summary", "")),
+                            "assets": list(analysis.assets),
+                            "event_type": analysis.event_type,
+                            "direction": analysis.direction,
+                            "importance": analysis.importance,
+                            "confidence": analysis.confidence,
+                            "horizon_seconds": int((response or {}).get("horizon_seconds", 3600)),
+                        }
+                        if analysis is not None
+                        else None
+                    ),
+                }
+            )
+            if len(result) >= limit:
+                break
+        return result
+
     @staticmethod
     def _to_event(analysis: LlmAnalysis, article: NewsArticle) -> IntelligenceEvent:
         response = analysis.response or {}
@@ -186,6 +238,39 @@ class AuditRepository:
             session.add(row)
             await session.commit()
             return row.id
+
+    async def save_algorithm_decision(
+        self,
+        ts_event: datetime,
+        strategy: str,
+        instrument: str,
+        decision: AlgorithmDecisionAudit,
+    ) -> str:
+        return await self.save_decision(
+            ts_event,
+            strategy,
+            instrument,
+            decision.as_payload(),
+            rationale=decision.summary,
+        )
+
+    async def get_recent_decisions(self, limit: int = 30) -> list[dict]:
+        if limit < 1 or limit > 100:
+            raise ValueError("decision audit limit must be between 1 and 100")
+        statement = select(StrategyDecision).order_by(StrategyDecision.ts_event.desc()).limit(limit)
+        async with SessionLocal() as session:
+            rows = list((await session.scalars(statement)).all())
+        return [
+            {
+                "decision_id": row.id,
+                "ts_event": row.ts_event.isoformat(),
+                "strategy": row.strategy,
+                "instrument": row.instrument,
+                "rationale": row.rationale,
+                "payload": row.payload,
+            }
+            for row in rows
+        ]
 
     async def save_experiment(self, **kwargs) -> str:
         row = Experiment(**kwargs)

@@ -128,3 +128,122 @@ def read_carry_scan_history(path: Path, *, symbol: str | None = None, limit: int
             for row in rows
         ],
     }
+
+
+def summarize_carry_scan_history(
+    path: Path,
+    *,
+    symbol: str | None = None,
+    lookback_hours: int = 168,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    if lookback_hours < 1 or lookback_hours > 24 * 90:
+        raise ValueError("carry scanner summary lookback must be between 1 and 2160 hours")
+    normalized_symbol = symbol.upper() if symbol else None
+    if not path.exists():
+        return _empty_summary(normalized_symbol, lookback_hours)
+
+    cutoff = (now or datetime.now(tz=UTC)) - timedelta(hours=lookback_hours)
+    uri = f"file:{path.resolve()}?mode=ro"
+    with sqlite3.connect(uri, uri=True) as connection:
+        run_row = connection.execute(
+            """
+            SELECT MIN(updated_at), MAX(updated_at), COUNT(*),
+                   COALESCE(SUM(CASE WHEN eligible_symbol_count > 0 THEN 1 ELSE 0 END), 0)
+            FROM carry_scan_runs
+            WHERE julianday(updated_at) >= julianday(?)
+            """,
+            (cutoff.isoformat(),),
+        ).fetchone()
+        run_count = int(run_row[2])
+        if run_count == 0:
+            return _empty_summary(normalized_symbol, lookback_hours)
+
+        query = """
+            SELECT symbol,
+                   COUNT(*) AS observation_count,
+                   SUM(CASE WHEN eligible = 1 THEN 1 ELSE 0 END) AS eligible_count,
+                   SUM(CASE WHEN current_funding > 0 THEN 1 ELSE 0 END) AS positive_funding_count,
+                   AVG(current_funding) AS average_current_funding,
+                   AVG(average_funding) AS average_historical_funding,
+                   SUM(CASE WHEN estimated_net_usdt > 0 THEN 1 ELSE 0 END) AS positive_net_count,
+                   AVG(estimated_net_usdt) AS average_estimated_net_usdt,
+                   MIN(estimated_net_usdt) AS minimum_estimated_net_usdt,
+                   MAX(estimated_net_usdt) AS maximum_estimated_net_usdt,
+                   AVG(break_even_settlements) AS average_break_even_settlements
+            FROM carry_scan_candidates
+            WHERE julianday(updated_at) >= julianday(?)
+        """
+        parameters: list[Any] = [cutoff.isoformat()]
+        if normalized_symbol:
+            query += " AND symbol = ?"
+            parameters.append(normalized_symbol)
+        query += """
+            GROUP BY symbol
+            ORDER BY eligible_count DESC, positive_net_count DESC,
+                     average_estimated_net_usdt DESC, observation_count DESC, symbol ASC
+        """
+        rows = connection.execute(query, parameters).fetchall()
+
+    symbols = []
+    for row in rows:
+        observation_count = int(row[1])
+        eligible_count = int(row[2])
+        positive_funding_count = int(row[3])
+        positive_net_count = int(row[6])
+        symbols.append(
+            {
+                "symbol": row[0],
+                "observation_count": observation_count,
+                "run_coverage_share": observation_count / run_count,
+                "eligible_count": eligible_count,
+                "eligible_share": eligible_count / observation_count,
+                "positive_current_funding_count": positive_funding_count,
+                "positive_current_funding_share": positive_funding_count / observation_count,
+                "average_current_funding": row[4],
+                "average_historical_funding": row[5],
+                "positive_estimated_net_count": positive_net_count,
+                "positive_estimated_net_share": positive_net_count / observation_count,
+                "average_estimated_net_usdt": row[7],
+                "minimum_estimated_net_usdt": row[8],
+                "maximum_estimated_net_usdt": row[9],
+                "average_break_even_settlements": row[10],
+            }
+        )
+
+    runs_with_eligible = int(run_row[3])
+    return {
+        "status": "available",
+        "source": "carry_scanner_history",
+        "orders_enabled": False,
+        "automatic_actions_enabled": False,
+        "symbol": normalized_symbol,
+        "lookback_hours": lookback_hours,
+        "window": {
+            "first_updated_at": run_row[0],
+            "last_updated_at": run_row[1],
+            "run_count": run_count,
+            "runs_with_eligible_candidate": runs_with_eligible,
+            "runs_with_eligible_candidate_share": runs_with_eligible / run_count,
+        },
+        "symbols": symbols,
+    }
+
+
+def _empty_summary(symbol: str | None, lookback_hours: int) -> dict[str, Any]:
+    return {
+        "status": "not_run",
+        "source": "carry_scanner_history",
+        "orders_enabled": False,
+        "automatic_actions_enabled": False,
+        "symbol": symbol,
+        "lookback_hours": lookback_hours,
+        "window": {
+            "first_updated_at": None,
+            "last_updated_at": None,
+            "run_count": 0,
+            "runs_with_eligible_candidate": 0,
+            "runs_with_eligible_candidate_share": 0.0,
+        },
+        "symbols": [],
+    }

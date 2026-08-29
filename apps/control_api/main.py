@@ -5,18 +5,25 @@ import os
 import sqlite3
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from prometheus_client import CONTENT_TYPE_LATEST, Gauge, generate_latest
 from sqlalchemy import text
-from starlette.responses import Response
+from sqlalchemy.exc import SQLAlchemyError
+from starlette.responses import FileResponse, Response
+from starlette.staticfiles import StaticFiles
 
+from apps.control_api.operator_data import merge_news_feed, prepare_stored_news, read_archived_news
 from intelligence.news.ingestion import DurableNewsState
 from platform_core.settings import load_settings
-from storage.carry_scanner_history import read_carry_scan_history
+from storage.carry_scanner_history import read_carry_scan_history, summarize_carry_scan_history
 from storage.database import engine
+from storage.repositories import AuditRepository
 
 app = FastAPI(title="Trading Platform Control API", version="0.2.0")
+STATIC_ROOT = Path(__file__).with_name("static")
+app.mount("/operator-assets", StaticFiles(directory=STATIC_ROOT), name="operator-assets")
 READY = Gauge("trading_platform_ready", "Whether control plane dependencies are ready")
+audit = AuditRepository()
 
 
 @app.get("/health")
@@ -157,6 +164,55 @@ def carry_scanner_history(symbol: str | None = None, limit: int = 100) -> dict:
         return read_carry_scan_history(path, symbol=symbol, limit=limit)
     except (OSError, ValueError, sqlite3.Error) as exc:
         return {"status": "invalid", "symbol": symbol, "observations": [], "status_error": type(exc).__name__}
+
+
+@app.get("/runtime/carry-scanner/summary")
+def carry_scanner_summary(symbol: str | None = None, hours: int = 168) -> dict:
+    path = Path(os.getenv("CARRY_SCANNER_HISTORY_DB", "/app/data/carry/scanner-history.sqlite3"))
+    try:
+        return summarize_carry_scan_history(path, symbol=symbol, lookback_hours=hours)
+    except (OSError, ValueError, sqlite3.Error) as exc:
+        return {
+            "status": "invalid",
+            "symbol": symbol,
+            "lookback_hours": hours,
+            "symbols": [],
+            "status_error": type(exc).__name__,
+        }
+
+
+@app.get("/operator", include_in_schema=False)
+def operator_console() -> FileResponse:
+    return FileResponse(STATIC_ROOT / "operator.html")
+
+
+@app.get("/operator/api/decisions")
+async def operator_decisions(limit: int = Query(default=30, ge=1, le=100)) -> dict:
+    try:
+        decisions = await audit.get_recent_decisions(limit)
+        return {"status": "available", "decisions": decisions}
+    except (SQLAlchemyError, ValueError) as exc:
+        return {"status": "degraded", "decisions": [], "status_error": type(exc).__name__}
+
+
+@app.get("/operator/api/news")
+async def operator_news(limit: int = Query(default=30, ge=1, le=100)) -> dict:
+    archive_path = Path(os.getenv("NEWS_ARCHIVE_PATH", "/app/data/news"))
+    archived = read_archived_news(archive_path, limit=limit)
+    database_error = None
+    try:
+        stored = prepare_stored_news(await audit.get_recent_news_with_analysis(limit))
+    except (SQLAlchemyError, ValueError) as exc:
+        stored = []
+        database_error = type(exc).__name__
+    result = {
+        "status": "available" if database_error is None else "degraded",
+        "items": merge_news_feed(stored, archived, limit=limit),
+        "analysis_enabled": os.getenv("INTELLIGENCE_ENABLED", "false").lower() == "true",
+    }
+    if database_error:
+        result["status_error"] = database_error
+    return result
 
 
 @app.get("/research/backtest")

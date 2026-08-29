@@ -302,6 +302,22 @@ Compact candidate observations are retained for 90 days in a local SQLite databa
 silent baseline. On a later `eligible=false` to `eligible=true` transition, it sends one deterministic Telegram review
 notice; repeated reads of the same snapshot are deduplicated and never place an order.
 
+`make demo-carry-summary` (or `HOURS=24 make demo-carry-summary`) aggregates that history without an LLM. The summary
+reports scan coverage, positive-funding and positive-net shares, estimated net ranges, break-even settlements and how
+often each symbol passed every filter. It is evidence for later review, not a forecast or an execution signal.
+
+## Operator decision journal
+
+Open `http://localhost:8000/operator` (shown by `make operator`) for the read-only operator console. It combines the
+current Demo carry state, after-cost scanner history, the immutable strategy-decision audit trail and the latest news.
+Archived news remains visible when the 14B service is offline; articles that have not been analysed are labelled as
+pending rather than assigned a synthetic interpretation.
+
+Future autonomous decision producers must persist the versioned `AlgorithmDecisionAudit` contract: action, plain
+summary, confidence, strategy and news explanations, linked news event IDs, passed risk checks, execution status and
+exchange order IDs. The same record can be rendered as a concise Telegram notification. The console and formatter do
+not enable autonomous execution; existing confirmation and risk gates remain authoritative.
+
 ## Safety
 
 - Never grant withdrawal permission to the bot key.

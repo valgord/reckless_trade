@@ -46,7 +46,11 @@
 - Read-only multi-pair Bybit carry scanner over common USDT Spot/Linear instruments, with liquidity, top-of-book,
   minimum-notional, recent-funding stability, fee and configurable holding-horizon filters. It has no credentials or
   execution path and only ranks observation candidates. Compact 90-day SQLite history and restart-safe Telegram
-  notifications track only new transitions into eligibility.
+  notifications track only new transitions into eligibility. A deterministic read-only summary aggregates scan
+  coverage, funding persistence, after-cost estimates and filter eligibility without requiring an LLM.
+- Read-only browser operator console for current carry state, scanner history, news and the strategy decision audit
+  trail. A versioned algorithm-decision contract and Telegram formatter keep news rationale, confidence, risk checks
+  and execution outcome visible without granting the UI or notification channel an execution capability.
 - PostgreSQL audit models, Docker Compose, optional Qdrant, Prometheus/Grafana, backup/restore and CI.
 - Live trading lock and physically separate demo/live credential names.
 

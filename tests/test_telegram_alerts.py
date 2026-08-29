@@ -6,6 +6,7 @@ from intelligence.providers.telegram import (
     TelegramBotClient,
     TelegramError,
     discover_private_start_chat,
+    format_algorithm_decision_message,
     format_carry_alert_message,
     format_scanner_candidates_message,
 )
@@ -92,3 +93,24 @@ def test_formats_orderless_new_scanner_candidate() -> None:
     assert "0.1200 USDT" in text
     assert "Позиция не открыта" in text
     assert "Автоматические заявки: ВЫКЛЮЧЕНЫ" in text
+
+
+def test_formats_human_readable_algorithm_decision() -> None:
+    text = format_algorithm_decision_message(
+        {
+            "instrument": "BYBIT:BTCUSDT",
+            "payload": {
+                "decision": {"action": "hold", "summary": "Funding remains positive.", "confidence": 0.82},
+                "analysis": {
+                    "news_summary": "No material negative news was detected.",
+                    "strategy_summary": "The hedge remains balanced.",
+                },
+                "execution": {"automatic": False, "status": "not_requested"},
+            },
+        }
+    )
+
+    assert "Решение: УДЕРЖИВАТЬ" in text
+    assert "Уверенность: 82%" in text
+    assert "Новости: No material negative news was detected." in text
+    assert "Автоматический режим: ВЫКЛЮЧЕН" in text

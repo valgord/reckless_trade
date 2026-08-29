@@ -123,3 +123,43 @@ def format_scanner_candidates_message(candidates: list[dict[str, Any]], horizon_
         ]
     )
     return "\n".join(lines)
+
+
+def format_algorithm_decision_message(record: dict[str, Any]) -> str:
+    payload = record.get("payload") or {}
+    decision = payload.get("decision") or {}
+    analysis = payload.get("analysis") or {}
+    execution = payload.get("execution") or {}
+    actions = {
+        "observe": "НАБЛЮДАТЬ",
+        "hold": "УДЕРЖИВАТЬ",
+        "open": "ОТКРЫТЬ",
+        "close": "ЗАКРЫТЬ",
+        "reduce": "СОКРАТИТЬ",
+        "rebalance": "ПЕРЕБАЛАНСИРОВАТЬ",
+        "block": "ЗАБЛОКИРОВАТЬ",
+    }
+    action = str(decision.get("action", "observe"))
+    confidence = float(decision.get("confidence", 0))
+    lines = [
+        "Reckless Trade Decision",
+        f"Решение: {actions.get(action, action.upper())}",
+        f"Инструмент: {record.get('instrument', 'unknown')}",
+        f"Уверенность: {confidence:.0%}",
+        f"Почему: {decision.get('summary', record.get('rationale', 'Нет описания'))}",
+    ]
+    news_summary = str(analysis.get("news_summary", "")).strip()
+    if news_summary:
+        lines.extend(["", f"Новости: {news_summary}"])
+    strategy_summary = str(analysis.get("strategy_summary", "")).strip()
+    if strategy_summary:
+        lines.append(f"Стратегия: {strategy_summary}")
+    automatic = bool(execution.get("automatic", False))
+    lines.extend(
+        [
+            "",
+            f"Исполнение: {execution.get('status', 'not_requested')}",
+            f"Автоматический режим: {'ВКЛЮЧЕН' if automatic else 'ВЫКЛЮЧЕН'}",
+        ]
+    )
+    return "\n".join(lines)

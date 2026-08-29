@@ -2,7 +2,7 @@ SHELL := /bin/bash
 PYTHON ?= python3
 M75_START ?= 2022-02-05T07:00:00+00:00
 
-.PHONY: doctor home-doctor home-config home-up home-validate home-history home-news-once home-m7 home-carry home-carry-scan home-carry-scanner-start home-carry-recover home-telegram-setup home-telegram-test home-carry-alerts-restart install test lint compile research-smoke history history-m5 carry-data m75-data m75 nautilus-backtest m2 m3 m4 m5 m6 m7 news-once up down logs demo-public demo demo-order-smoke demo-observe demo-carry-observe demo-carry-report demo-carry-scan demo-carry-alerts demo-carry-recover demo-carry-open demo-carry-close demo-pause live intelligence observability health status backup init-db restore
+.PHONY: doctor home-doctor home-config home-up home-validate home-history home-news-once home-m7 home-carry home-carry-scan home-carry-scanner-start home-carry-recover home-telegram-setup home-telegram-test home-carry-alerts-restart install test lint compile research-smoke history history-m5 carry-data m75-data m75 nautilus-backtest m2 m3 m4 m5 m6 m7 news-once up down logs demo-public demo demo-order-smoke demo-observe demo-carry-observe demo-carry-report demo-carry-scan demo-carry-summary demo-carry-alerts demo-carry-recover demo-carry-open demo-carry-close demo-pause live intelligence observability health status operator backup init-db restore
 
 doctor:
 	@echo "== Host =="; uname -a
@@ -147,6 +147,9 @@ demo-carry-report:
 demo-carry-scan:
 	docker compose --profile carry run --rm --build --no-deps carry-scanner python -m apps.trader.carry_scanner
 
+demo-carry-summary:
+	curl -fsS "http://localhost:8000/runtime/carry-scanner/summary?hours=$${HOURS:-168}" && echo
+
 demo-carry-alerts:
 	docker compose --profile carry run --rm --build carry-alerts python -m apps.trader.carry_alerts
 
@@ -180,6 +183,9 @@ health:
 
 status:
 	curl -fsS http://localhost:8000/status && echo
+
+operator:
+	@echo "Open http://localhost:8000/operator"
 
 backup:
 	@mkdir -p backups
